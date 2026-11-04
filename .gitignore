@@ -40,3 +40,6 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 !.env.example
+
+# Channel3 snapshot: rebuilt with `npm run catalog` (check Channel3 terms before committing their data)
+/data/catalog.json
