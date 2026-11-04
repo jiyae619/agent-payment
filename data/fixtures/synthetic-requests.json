@@ -1,0 +1,140 @@
+{
+  "_note": "SYNTHETIC. Written by Claude playing shopper personas, for test fixtures and plain-language copy only. Not user research: never quote these as tester results.",
+  "_expect": "Fields in `expect` are what deterministic checks should find. max/checkin_over: dollar amounts (null = none said). stores: stores the shopper named ([] = none). must_haves: words the drafter should keep. warnings: readback warnings that should fire. unmapped: phrases that can't become rules.",
+  "personas": [
+    { "id": "p01", "name": "Busy parent", "tech": "low", "note": "Types on phone between errands, short sentences" },
+    { "id": "p02", "name": "Retired teacher", "tech": "low", "note": "Polite, full sentences, cautious about money" },
+    { "id": "p03", "name": "Night-shift nurse", "tech": "medium", "note": "Wants it handled, hates surprises" },
+    { "id": "p04", "name": "First-time online shopper", "tech": "low", "note": "Unsure what to say, vague" },
+    { "id": "p05", "name": "Grandparent buying a gift", "tech": "low", "note": "Buying for someone else, ships elsewhere" },
+    { "id": "p06", "name": "College student", "tech": "high", "note": "Price-driven, casual typing" },
+    { "id": "p07", "name": "Small-shop owner", "tech": "medium", "note": "Trusts a few stores only" },
+    { "id": "p08", "name": "Runner training for a race", "tech": "medium", "note": "Specific about features" },
+    { "id": "p09", "name": "New parent, very tired", "tech": "low", "note": "Typos, wants it done" },
+    { "id": "p10", "name": "Values-focused shopper", "tech": "medium", "note": "Cares about privacy and ads" },
+    { "id": "p11", "name": "Caregiver for a parent", "tech": "low", "note": "Repeat purchases, routine" },
+    { "id": "p12", "name": "Skeptical shopper", "tech": "medium", "note": "Wants to approve everything" }
+  ],
+  "requests": [
+    {
+      "id": "shoes-01", "persona": "p01", "scenario": "shoes",
+      "text": "running shoes size 8 waterproof under 120. free returns pls. ask me if its over 100",
+      "expect": { "max": 120, "checkin_over": 100, "stores": [], "must_haves": ["waterproof", "size 8"], "warnings": ["any_store"], "unmapped": [] }
+    },
+    {
+      "id": "shoes-02", "persona": "p02", "scenario": "shoes",
+      "text": "Could you please find me a pair of comfortable walking or running shoes in a women's size 7? I'd like to spend no more than $90, and I would prefer to buy from REI or Zappos only.",
+      "expect": { "max": 90, "checkin_over": null, "stores": ["rei.com", "zappos.com"], "must_haves": ["women's size 7"], "warnings": [], "unmapped": ["comfortable"] }
+    },
+    {
+      "id": "shoes-03", "persona": "p03", "scenario": "shoes",
+      "text": "Need trail runners, men's 10, must be waterproof, budget $130 max. Don't switch brands on me without asking. Need them before Saturday.",
+      "expect": { "max": 130, "checkin_over": null, "stores": [], "must_haves": ["waterproof", "men's 10"], "warnings": ["any_store"], "unmapped": [] }
+    },
+    {
+      "id": "shoes-04", "persona": "p04", "scenario": "shoes",
+      "text": "I need new shoes for running, not too expensive",
+      "expect": { "max": null, "checkin_over": null, "stores": [], "must_haves": [], "warnings": ["no_amount", "any_store"], "unmapped": ["not too expensive"] }
+    },
+    {
+      "id": "shoes-05", "persona": "p05", "scenario": "shoes",
+      "text": "My grandson runs cross country. Please buy him good running shoes, men's size 9, around $100 but no more than $110. Send them to his dorm, not to me. It's a gift so no price in the box.",
+      "expect": { "max": 110, "checkin_over": null, "stores": [], "must_haves": ["men's size 9"], "warnings": ["any_store"], "unmapped": ["no price in the box"] }
+    },
+    {
+      "id": "shoes-06", "persona": "p06", "scenario": "shoes",
+      "text": "cheapest decent running shoes size 11, like under 70 bucks, any store is fine",
+      "expect": { "max": 70, "checkin_over": null, "stores": [], "must_haves": ["size 11"], "warnings": [], "unmapped": ["decent"] }
+    },
+    {
+      "id": "shoes-07", "persona": "p07", "scenario": "shoes",
+      "text": "Only buy from Nike or Brooks directly. Size 9.5 road shoes, under $140. Must be returnable for free.",
+      "expect": { "max": 140, "checkin_over": null, "stores": ["nike.com", "brooksrunning.com"], "must_haves": ["size 9.5"], "warnings": [], "unmapped": [] }
+    },
+    {
+      "id": "shoes-08", "persona": "p08", "scenario": "shoes",
+      "text": "Waterproof trail shoes, size 8, Gore-Tex if possible, rock plate, under $150. If it's more than $120 check with me first. Exactly the model I pick or nothing.",
+      "expect": { "max": 150, "checkin_over": 120, "stores": [], "must_haves": ["waterproof", "size 8"], "warnings": ["any_store"], "unmapped": [] }
+    },
+    {
+      "id": "shoes-09", "persona": "p09", "scenario": "shoes",
+      "text": "runing shoes sz 8 womens, waterprof, $100ish, just get them",
+      "expect": { "max": 100, "checkin_over": null, "stores": [], "must_haves": ["waterproof", "women's size 8"], "warnings": ["any_store"], "unmapped": [] }
+    },
+    {
+      "id": "shoes-10", "persona": "p10", "scenario": "shoes",
+      "text": "Running shoes size 10, under $120. No sponsored or ad-boosted picks, and don't share my email with the store.",
+      "expect": { "max": 120, "checkin_over": null, "stores": [], "must_haves": ["size 10"], "warnings": ["any_store"], "unmapped": ["no sponsored", "don't share my email"] }
+    },
+    {
+      "id": "shoes-11", "persona": "p11", "scenario": "shoes",
+      "text": "Same shoes as last time for my mom, size 7 wide, under $95.",
+      "expect": { "max": 95, "checkin_over": null, "stores": [], "must_haves": ["size 7 wide"], "warnings": ["any_store"], "unmapped": ["same shoes as last time"] }
+    },
+    {
+      "id": "shoes-12", "persona": "p12", "scenario": "shoes",
+      "text": "Find waterproof running shoes, size 8, under $120, but show me before you pay for anything.",
+      "expect": { "max": 120, "checkin_over": 0, "stores": [], "must_haves": ["waterproof", "size 8"], "warnings": ["any_store"], "unmapped": [] }
+    },
+    {
+      "id": "refill-01", "persona": "p01", "scenario": "refill",
+      "text": "reorder dish soap, the big refill, under 20",
+      "expect": { "max": 20, "checkin_over": null, "stores": [], "must_haves": ["refill"], "warnings": ["any_store"], "unmapped": [] }
+    },
+    {
+      "id": "refill-02", "persona": "p02", "scenario": "refill",
+      "text": "Please buy one bottle of unscented dish soap. I don't want to spend more than $15 including shipping.",
+      "expect": { "max": 15, "checkin_over": null, "stores": [], "must_haves": ["unscented"], "warnings": ["any_store"], "unmapped": [] }
+    },
+    {
+      "id": "refill-03", "persona": "p03", "scenario": "refill",
+      "text": "Laundry pods, free & clear, under $25. Target or Amazon only.",
+      "expect": { "max": 25, "checkin_over": null, "stores": ["target.com", "amazon.com"], "must_haves": ["free & clear"], "warnings": [], "unmapped": [] }
+    },
+    {
+      "id": "refill-04", "persona": "p04", "scenario": "refill",
+      "text": "I ran out of dish soap",
+      "expect": { "max": null, "checkin_over": null, "stores": [], "must_haves": [], "warnings": ["no_amount", "any_store"], "unmapped": [] }
+    },
+    {
+      "id": "refill-05", "persona": "p05", "scenario": "refill",
+      "text": "Send a big box of laundry pods to my daughter's apartment, up to $30.",
+      "expect": { "max": 30, "checkin_over": null, "stores": [], "must_haves": [], "warnings": ["any_store"], "unmapped": [] }
+    },
+    {
+      "id": "refill-06", "persona": "p06", "scenario": "refill",
+      "text": "cheapest dish soap, like $8 max lol",
+      "expect": { "max": 8, "checkin_over": null, "stores": [], "must_haves": [], "warnings": ["any_store"], "unmapped": [] }
+    },
+    {
+      "id": "refill-07", "persona": "p07", "scenario": "refill",
+      "text": "Dish soap for the shop, 3 bottles, only from Costco, $25 total.",
+      "expect": { "max": 25, "checkin_over": null, "stores": ["costco.com"], "must_haves": ["3 bottles"], "warnings": [], "unmapped": [] }
+    },
+    {
+      "id": "refill-08", "persona": "p08", "scenario": "refill",
+      "text": "Laundry detergent pods for sports clothes, under $20, ask me if you want a different brand than Tide.",
+      "expect": { "max": 20, "checkin_over": null, "stores": [], "must_haves": ["Tide"], "warnings": ["any_store"], "unmapped": [] }
+    },
+    {
+      "id": "refill-09", "persona": "p09", "scenario": "refill",
+      "text": "laundy pods asap under 25 dollars",
+      "expect": { "max": 25, "checkin_over": null, "stores": [], "must_haves": [], "warnings": ["any_store"], "unmapped": ["asap"] }
+    },
+    {
+      "id": "refill-10", "persona": "p10", "scenario": "refill",
+      "text": "Eco-friendly dish soap, no plastic bottle if possible, under $18, don't sign me up for any emails.",
+      "expect": { "max": 18, "checkin_over": null, "stores": [], "must_haves": ["eco-friendly"], "warnings": ["any_store"], "unmapped": ["no plastic bottle if possible", "don't sign me up for any emails"] }
+    },
+    {
+      "id": "refill-11", "persona": "p11", "scenario": "refill",
+      "text": "Buy the usual laundry pods for my dad every month, $25 each time.",
+      "expect": { "max": 25, "checkin_over": null, "stores": [], "must_haves": [], "warnings": ["any_store", "recurring_no_budget"], "unmapped": ["the usual"] }
+    },
+    {
+      "id": "refill-12", "persona": "p12", "scenario": "refill",
+      "text": "Dish soap under $12, but you said $50 last time so double-check the price with me.",
+      "expect": { "max": 12, "checkin_over": 0, "stores": [], "must_haves": [], "warnings": ["any_store"], "unmapped": [] }
+    }
+  ]
+}
