@@ -9,9 +9,12 @@
     "lint": "eslint",
     "catalog": "node --env-file=.env.local scripts/build-catalog.mts",
     "check-schema": "node scripts/check-schema.mts",
-    "check-search": "node --env-file=.env.local scripts/check-search.mts"
+    "check-search": "node --env-file=.env.local scripts/check-search.mts",
+    "test": "node --test tests/*.test.mts",
+    "fixtures": "node --env-file=.env.local scripts/run-fixtures.mts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^1.5.0",
     "next": "16.4.3",
     "react": "19.3.0",
     "react-dom": "19.3.0",

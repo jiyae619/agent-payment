@@ -43,3 +43,6 @@ next-env.d.ts
 
 # Channel3 snapshot: rebuilt with `npm run catalog` (check Channel3 terms before committing their data)
 /data/catalog.json
+
+# Claude output from npm run fixtures (regenerated each run)
+/data/fixtures/last-run.json
