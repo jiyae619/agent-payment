@@ -10,6 +10,7 @@ import {
   money,
   paypal,
   setupTokenBody,
+  stepRequestId,
   vaultedHoldOrderBody,
 } from "@/lib/paypal";
 
@@ -46,7 +47,9 @@ async function handle(action: string, body: Body, origin: string) {
 
     // After the shopper approves, place the hold.
     case "authorize": {
-      const order = await paypal("POST", `/v2/checkout/orders/${body.orderId}/authorize`, {});
+      const order = await paypal("POST", `/v2/checkout/orders/${body.orderId}/authorize`, {}, {
+        requestId: stepRequestId(String(body.orderId), "authorize"),
+      });
       return { orderId: order.id, status: order.status, authorization: authorizationFrom(order) };
     }
 
@@ -55,19 +58,28 @@ async function handle(action: string, body: Body, origin: string) {
       const amount = Number(body.amount);
       const auth = await paypal("GET", `/v2/payments/authorizations/${body.authorizationId}`);
       const held = Number(auth.amount.value);
+      // Check the hold is still open first: with a stable request id, PayPal would answer a
+      // second charge with the first charge's result, which would look like a new charge.
+      if (auth.status !== "CREATED") {
+        throw new Error(`Refused: this hold is ${auth.status}, so it can't be charged`);
+      }
       if (!(amount > 0) || amount > held) {
         throw new Error(`Refused: capture $${amount} is not within the $${held.toFixed(2)} the shopper approved`);
       }
-      const capture = await paypal("POST", `/v2/payments/authorizations/${body.authorizationId}/capture`, {
-        amount: money(amount),
-        final_capture: true,
-      });
+      const capture = await paypal(
+        "POST",
+        `/v2/payments/authorizations/${body.authorizationId}/capture`,
+        { amount: money(amount), final_capture: true },
+        { requestId: stepRequestId(String(body.authorizationId), "capture") },
+      );
       return { capture, released: (held - amount).toFixed(2) };
     }
 
     // Release the hold; nothing is charged.
     case "void": {
-      await paypal("POST", `/v2/payments/authorizations/${body.authorizationId}/void`, {});
+      await paypal("POST", `/v2/payments/authorizations/${body.authorizationId}/void`, {}, {
+        requestId: stepRequestId(String(body.authorizationId), "void"),
+      });
       return { authorization: await paypal("GET", `/v2/payments/authorizations/${body.authorizationId}`) };
     }
 
@@ -86,9 +98,12 @@ async function handle(action: string, body: Body, origin: string) {
     }
 
     case "vault-token": {
-      const token = await paypal("POST", "/v3/vault/payment-tokens", {
-        payment_source: { token: { id: body.setupTokenId, type: "SETUP_TOKEN" } },
-      });
+      const token = await paypal(
+        "POST",
+        "/v3/vault/payment-tokens",
+        { payment_source: { token: { id: body.setupTokenId, type: "SETUP_TOKEN" } } },
+        { requestId: stepRequestId(String(body.setupTokenId), "vault-token") },
+      );
       return { vaultId: token.id, customerId: token.customer?.id };
     }
 

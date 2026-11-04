@@ -35,15 +35,29 @@ async function getAccessToken(): Promise<string> {
 }
 
 export class PayPalError extends Error {
-  constructor(public path: string, public status: number, public body: unknown) {
+  path: string;
+  status: number;
+  body: unknown;
+  constructor(path: string, status: number, body: unknown) {
     super(`PayPal ${path} failed with ${status}`);
+    this.path = path;
+    this.status = status;
+    this.body = body;
   }
+}
+
+// One id per step on one PayPal resource (e.g. "capture" on an authorization). PayPal answers a
+// repeated request id with the first result instead of acting again, so a retried charge or
+// release can never run twice. A fresh id per call would defeat this.
+export function stepRequestId(resourceId: string, step: string): string {
+  return `${step}-${resourceId}`;
 }
 
 export async function paypal<T = Json>(
   method: "GET" | "POST",
   path: string,
   body?: unknown,
+  opts: { requestId?: string } = {},
 ): Promise<T> {
   const token = await getAccessToken();
   const res = await fetch(`${BASE}${path}`, {
@@ -52,8 +66,9 @@ export async function paypal<T = Json>(
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
       Prefer: "return=representation",
-      // Idempotency: a retried capture or void must not run twice.
-      ...(method === "POST" ? { "PayPal-Request-Id": crypto.randomUUID() } : {}),
+      // Idempotency: money-moving steps pass a stable id (stepRequestId). Creating a new
+      // order or token has no stable key yet, so it gets a fresh one.
+      ...(method === "POST" ? { "PayPal-Request-Id": opts.requestId ?? crypto.randomUUID() } : {}),
     },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
