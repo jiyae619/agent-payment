@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "catalog": "node --env-file=.env.local scripts/build-catalog.mts",
-    "check-schema": "node scripts/check-schema.mts"
+    "check-schema": "node scripts/check-schema.mts",
+    "check-search": "node --env-file=.env.local scripts/check-search.mts"
   },
   "dependencies": {
     "next": "16.4.3",
