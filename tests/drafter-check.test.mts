@@ -75,6 +75,46 @@ const faithful: Record<string, Draft> = {
     max_total: { amount: 20, source_phrase: "Under $20" },
     must_haves: [{ attr: "brand", value: "Tide", source_phrase: "Tide pods only, no other brand" }],
   }),
+  "refill-14": draft({
+    line_items: [{ description: "$50 gift card", quantity: 1, source_phrase: "a $50 gift card" }],
+    max_total: { amount: 50, source_phrase: "$50" },
+  }),
+  "shoes-13": draft({
+    max_total: { amount: 100, source_phrase: "under $100" },
+    must_haves: [{ attr: "size", value: "9", source_phrase: "size 9" }],
+    valid_for_hours: { hours: 336, source_phrase: "Keep looking for 2 weeks" },
+  }),
+  "shoes-14": draft({
+    max_total: { amount: 100, source_phrase: "under $100" },
+    must_haves: [{ attr: "size", value: "9", source_phrase: "size 9" }],
+    deliver_by: { when: "Friday", source_phrase: "They need to arrive by Friday" },
+  }),
+  "shoes-16": draft({
+    max_total: { amount: 110, source_phrase: "under $110" },
+    must_haves: [{ attr: "size", value: "10", source_phrase: "Size 10" }],
+    conditions_of_sale: [{ attr: "condition", value: "new", source_phrase: "New running shoes only" }],
+    checkins: [{ type: "new_store", amount: null, source_phrase: "Ask me before trying a store I haven't used" }],
+  }),
+  "refill-17": draft({
+    max_total: { amount: 15, source_phrase: "$15 max each time" },
+    recurrence: "weekly", budget_total: 60,
+  }),
+  "refill-18": draft({
+    line_items: [
+      { description: "dish soap", quantity: 1, source_phrase: "dish soap" },
+      { description: "laundry pods", quantity: 1, source_phrase: "laundry pods" },
+    ],
+    max_total: { amount: 40, source_phrase: "under $40 for both" },
+  }),
+  "shoes-17": draft({
+    line_items: [],
+    max_total: { amount: 50, source_phrase: "up to $50" },
+    unmapped: [{ phrase: "whatever you think is good", reason: "The assistant can't know your taste" }],
+  }),
+  "refill-19": draft({
+    line_items: [{ description: "dish soap", quantity: 1, source_phrase: "Dish soap" }],
+    max_total: { amount: 10, source_phrase: "under $10" },
+  }),
 };
 
 test("a draft that keeps everything the shopper said passes, so the new checks don't fail good models", () => {
@@ -129,6 +169,51 @@ test("words in the new fields must be the shopper's own, like every other rule",
 });
 
 test("every request's expectations use only known fields, so a typo can't silently switch a check off", () => {
-  const known = new Set(["max", "checkin_over", "stores", "must_haves", "warnings", "unmapped", "not_must_haves", "quantity", "conditions_of_sale", "deliver_by", "ship_to", "exact_item", "substitute_asked"]);
+  const required = ["max", "checkin_over", "stores", "must_haves", "warnings", "unmapped"];
+  for (const r of fixtures.requests as Req[]) for (const k of required) assert.ok(k in r.expect, `${r.id}: missing required field ${k}`);
+  const known = new Set(["max", "checkin_over", "stores", "must_haves", "warnings", "unmapped", "not_must_haves", "quantity", "conditions_of_sale", "deliver_by", "ship_to", "exact_item", "substitute_asked", "items", "search_window", "new_store_asked", "recurrence", "budget"]);
   for (const r of fixtures.requests as Req[]) for (const k of Object.keys(r.expect)) assert.ok(known.has(k), `${r.id}: unknown field ${k}`);
+});
+
+test("hiding the gift card in a vague item fails and is critical, because code can only block what it can see", () => {
+  const d = { ...faithful["refill-14"], line_items: [{ description: "birthday present", quantity: 1, source_phrase: null }] };
+  const problems = score("refill-14", d);
+  assert.ok(problems.some((p) => /item "gift card" missing/.test(p) && isCritical(p)), problems.join("\n"));
+});
+
+test("a deadline is not a search window, and the reverse, so 'arrive by Friday' doesn't become 'stop looking Friday'", () => {
+  const window = { ...faithful["shoes-14"], valid_for_hours: { hours: 48, source_phrase: "They need to arrive by Friday" } };
+  assert.match(score("shoes-14", window).join("\n"), /search window "They need to arrive by Friday" invented/);
+  const lost = { ...faithful["shoes-13"], valid_for_hours: { hours: null, source_phrase: null } };
+  assert.match(score("shoes-13", lost).join("\n"), /search window "2 weeks" missing/);
+});
+
+test("the shopper's own 'ask before a new store' must be kept, not just the app's default", () => {
+  assert.match(score("shoes-16", { ...faithful["shoes-16"], checkins: [] }).join("\n"), /ask-before-new-store from the shopper's words false/);
+});
+
+test("'new, not used' must reach the product check, or a used pair could be bought", () => {
+  assert.match(score("shoes-16", { ...faithful["shoes-16"], conditions_of_sale: [] }).join("\n"), /condition of sale "new" missing/);
+});
+
+test("weekly buying with a $60 total must keep both, because a lost total lets it buy forever", () => {
+  const d = faithful["refill-17"];
+  assert.match(score("refill-17", { ...d, recurrence: "monthly" }).join("\n"), /recurrence monthly ≠ expected weekly/);
+  const problems = score("refill-17", { ...d, budget_total: null });
+  assert.ok(problems.some((p) => /^budget null ≠ expected 60/.test(p) && isCritical(p)), problems.join("\n"));
+});
+
+test("two items stay two items, so neither gets dropped from the order", () => {
+  const d = faithful["refill-18"];
+  assert.match(score("refill-18", { ...d, line_items: d.line_items.slice(0, 1) }).join("\n"), /item "laundry pods" missing/);
+});
+
+test("'buy whatever you think' must leave the product open, so the any-product warning reaches the shopper", () => {
+  const d = { ...faithful["shoes-17"], line_items: [{ description: "something good", quantity: 1, source_phrase: null }] };
+  assert.match(score("shoes-17", d).join("\n"), /warning any_product missing/);
+});
+
+test("an instruction inside the request can't remove the price limit, because that would be an invented 'any amount'", () => {
+  const problems = score("refill-19", { ...faithful["refill-19"], max_total: { amount: null, source_phrase: null } });
+  assert.ok(problems.some((p) => /^max null ≠ expected 10/.test(p) && isCritical(p)), problems.join("\n"));
 });

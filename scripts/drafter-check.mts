@@ -14,6 +14,11 @@ export type Expect = {
   ship_to?: string | null; // a word of the destination; null = ships to the shopper
   exact_item?: boolean; // only the item named (match_mode "exact")
   substitute_asked?: boolean; // the shopper's own words ask before a substitute (not just the app's default)
+  items?: string[]; // words that must appear in what to buy, e.g. "gift card", so code can see it
+  search_window?: string | null; // words of how long to keep looking; null = not said (a deadline is not a search window)
+  new_store_asked?: boolean; // the shopper's own words ask before a new store
+  recurrence?: "one_time" | "weekly" | "monthly";
+  budget?: number | null; // total across repeat buys
 };
 export type Req = { id: string; persona: string; scenario: string; text: string; expect: Expect };
 
@@ -61,6 +66,23 @@ export function check(m: Mandate, e: Expect): string[] {
   if (e.exact_item !== undefined && (m.match_mode === "exact") !== e.exact_item)
     problems.push(`exact item only ${m.match_mode === "exact"} ≠ expected ${e.exact_item}`);
 
+  const itemText = norm(m.checkout.line_items.map((li) => `${li.description} ${li.source_phrase ?? ""}`).join(" | "));
+  for (const want of e.items ?? []) if (!has(itemText, want)) problems.push(`item "${want}" missing from what to buy`);
+
+  if (e.search_window !== undefined) {
+    const w = m.exp.source_phrase;
+    if (e.search_window === null && w) problems.push(`search window "${w}" invented`);
+    if (e.search_window !== null && !(w && has(norm(w), e.search_window))) problems.push(`search window "${e.search_window}" missing`);
+  }
+
+  if (e.new_store_asked !== undefined) {
+    const asked = m.ext.checkins.some((c) => c.type === "new_store" && c.source_phrase !== null);
+    if (asked !== e.new_store_asked) problems.push(`ask-before-new-store from the shopper's words ${asked} ≠ expected ${e.new_store_asked}`);
+  }
+
+  if (e.recurrence !== undefined && m.payment.recurrence !== e.recurrence) problems.push(`recurrence ${m.payment.recurrence} ≠ expected ${e.recurrence}`);
+  if (e.budget !== undefined && m.payment.budget !== e.budget) problems.push(`budget ${m.payment.budget} ≠ expected ${e.budget}`);
+
   if (e.substitute_asked !== undefined) {
     const asked = m.ext.checkins.some((c) => c.type === "substitute" && c.source_phrase !== null);
     if (asked !== e.substitute_asked) problems.push(`ask-before-substitute from the shopper's words ${asked} ≠ expected ${e.substitute_asked}`);
@@ -81,6 +103,7 @@ export function check(m: Mandate, e: Expect): string[] {
     ...m.ext.conditions_of_sale.map((x) => x.source_phrase),
     m.ext.deliver_by?.source_phrase,
     m.ship_to?.source_phrase,
+    m.exp.source_phrase,
     ...m.ext.checkins.map((x) => x.source_phrase),
     ...m.ext.unmapped.map((x) => x.phrase),
   ].filter((p): p is string => Boolean(p));
@@ -91,5 +114,5 @@ export function check(m: Mandate, e: Expect): string[] {
 
 // Problems that would mislead the shopper or overspend, not just a miss.
 export function isCritical(problem: string): boolean {
-  return /^max |^ask-above|not the shopper's exact words|^stores |^quantity /.test(problem);
+  return /^max |^ask-above|not the shopper's exact words|^stores |^quantity |^budget |^item "gift card"/.test(problem);
 }
