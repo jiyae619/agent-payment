@@ -13,6 +13,7 @@ type Config = { models: string[]; cases?: string[]; runs?: number; concurrency?:
 type Row = {
   model: string; caseId: string; run: number; ok: boolean; critical: string[]; problems: string[];
   validJson: boolean; enforcedJson: boolean; attempts: number; ms: number; input: number; output: number; error: string | null;
+  mandate?: unknown; // what the model drafted, for reading side by side
 };
 
 const config: Config = JSON.parse(await readFile(new URL("../eval/config.json", import.meta.url), "utf8"));
@@ -31,8 +32,10 @@ await Promise.all(
       let row: Row;
       try {
         const r = await chatJSON({ model, system: DRAFT_SYSTEM, user: c.text, schema: Draft, schemaName: "draft" });
-        const problems = r.data ? check(normalizeDraft(r.data, c.text), c.expect) : [`no valid draft: ${r.error}`];
+        const mandate = r.data ? normalizeDraft(r.data, c.text) : undefined;
+        const problems = mandate ? check(mandate, c.expect) : [`no valid draft: ${r.error}`];
         row = {
+          mandate,
           model, caseId: c.id, run, ok: problems.length === 0, problems, critical: problems.filter(isCritical),
           validJson: r.data !== null, enforcedJson: r.enforcedJson, attempts: r.attempts, ms: r.ms,
           input: r.usage.input, output: r.usage.output, error: r.error,
