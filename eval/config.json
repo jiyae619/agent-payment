@@ -1,0 +1,6 @@
+{
+  "models": ["claude-haiku-4-5"],
+  "cases": ["shoes-01"],
+  "runs": 1,
+  "concurrency": 3
+}

@@ -1,0 +1,71 @@
+// Model comparison on the synthetic request fixtures, through the Astropods AI Gateway.
+// Runs inside `ast project start` (the gateway key is only injected there); see eval/README.md.
+// Reads eval/config.json, writes data/eval/<timestamp>.json, prints a scorecard.
+// Synthetic data: for choosing a model, not user research.
+
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { Draft, normalizeDraft } from "../lib/draft-schema.ts";
+import { DRAFT_SYSTEM } from "../lib/draft-prompt.ts";
+import { chatJSON } from "../lib/llm-gateway.ts";
+import { check, isCritical, type Req } from "./drafter-check.mts";
+
+type Config = { models: string[]; cases?: string[]; runs?: number; concurrency?: number };
+type Row = {
+  model: string; caseId: string; run: number; ok: boolean; critical: string[]; problems: string[];
+  validJson: boolean; enforcedJson: boolean; attempts: number; ms: number; input: number; output: number; error: string | null;
+};
+
+const config: Config = JSON.parse(await readFile(new URL("../eval/config.json", import.meta.url), "utf8"));
+const fixtures = JSON.parse(await readFile(new URL("../data/fixtures/synthetic-requests.json", import.meta.url), "utf8"));
+const cases: Req[] = fixtures.requests.filter((r: Req) => !config.cases?.length || config.cases.includes(r.id));
+const runs = config.runs ?? 1;
+
+const jobs = config.models.flatMap((model) => cases.flatMap((c) => Array.from({ length: runs }, (_, i) => ({ model, c, run: i + 1 }))));
+console.log(`Eval: ${config.models.length} model(s) × ${cases.length} case(s) × ${runs} run(s) = ${jobs.length} calls`);
+
+const rows: Row[] = [];
+await Promise.all(
+  Array.from({ length: config.concurrency ?? 3 }, async () => {
+    for (let job = jobs.shift(); job; job = jobs.shift()) {
+      const { model, c, run } = job;
+      let row: Row;
+      try {
+        const r = await chatJSON({ model, system: DRAFT_SYSTEM, user: c.text, schema: Draft, schemaName: "draft" });
+        const problems = r.data ? check(normalizeDraft(r.data, c.text), c.expect) : [`no valid draft: ${r.error}`];
+        row = {
+          model, caseId: c.id, run, ok: problems.length === 0, problems, critical: problems.filter(isCritical),
+          validJson: r.data !== null, enforcedJson: r.enforcedJson, attempts: r.attempts, ms: r.ms,
+          input: r.usage.input, output: r.usage.output, error: r.error,
+        };
+      } catch (err) {
+        row = { model, caseId: c.id, run, ok: false, problems: [], critical: [], validJson: false, enforcedJson: false, attempts: 0, ms: 0, input: 0, output: 0, error: (err as Error).message };
+      }
+      rows.push(row);
+      console.log(`${row.ok ? "PASS" : "FAIL"} ${model} ${c.id}#${run} ${(row.ms / 1000).toFixed(1)}s${row.error ? ` (${row.error.slice(0, 120)})` : ""}`);
+    }
+  }),
+);
+
+// Scorecard: one line per model.
+const pct = (n: number, d: number) => (d ? `${Math.round((100 * n) / d)}%` : "-");
+console.log("\nmodel".padEnd(26) + "pass   critical  validJSON  enforced  avg s   tokens in/out");
+for (const model of config.models) {
+  const r = rows.filter((x) => x.model === model);
+  const avg = r.reduce((s, x) => s + x.ms, 0) / Math.max(1, r.length) / 1000;
+  console.log(
+    model.padEnd(25) +
+      pct(r.filter((x) => x.ok).length, r.length).padEnd(7) +
+      String(r.filter((x) => x.critical.length > 0).length).padEnd(10) +
+      pct(r.filter((x) => x.validJson).length, r.length).padEnd(11) +
+      (r.some((x) => x.enforcedJson) ? "yes" : "no").padEnd(10) +
+      avg.toFixed(1).padEnd(8) +
+      `${r.reduce((s, x) => s + x.input, 0)}/${r.reduce((s, x) => s + x.output, 0)}`,
+  );
+}
+console.log("\nCritical = a wrong price limit or ask-above amount, a store the shopper didn't name, or words that aren't the shopper's own.");
+console.log("Real cost per model: run `ast billing models` on your Mac.");
+
+await mkdir(new URL("../data/eval/", import.meta.url), { recursive: true });
+const out = new URL(`../data/eval/${new Date().toISOString().replace(/[:.]/g, "-")}.json`, import.meta.url);
+await writeFile(out, JSON.stringify({ config, rows }, null, 2) + "\n");
+console.log(`Saved ${out.pathname}`);
