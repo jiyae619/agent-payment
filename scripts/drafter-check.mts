@@ -4,7 +4,17 @@
 import { findWarnings } from "../lib/warnings.ts";
 import type { Mandate } from "../lib/mandate.ts";
 
-export type Expect = { max: number | null; checkin_over: number | null; stores: string[]; must_haves: string[]; warnings: string[]; unmapped: string[] };
+export type Expect = {
+  max: number | null; checkin_over: number | null; stores: string[]; must_haves: string[]; warnings: string[]; unmapped: string[];
+  // Optional: left out of a request where its wording is ambiguous, and then not scored.
+  not_must_haves?: string[]; // words that must not become a hard feature (a soft preference like "ask me if you want a different brand than Tide")
+  quantity?: number; // how many items, across line items
+  conditions_of_sale?: string[]; // store terms to keep, e.g. "free return"
+  deliver_by?: string | null; // words of the deadline; null = none said, so none may be invented
+  ship_to?: string | null; // a word of the destination; null = ships to the shopper
+  exact_item?: boolean; // only the item named (match_mode "exact")
+  substitute_asked?: boolean; // the shopper's own words ask before a substitute (not just the app's default)
+};
 export type Req = { id: string; persona: string; scenario: string; text: string; expect: Expect };
 
 const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9& ]/g, " ").replace(/\s+/g, " ").trim();
@@ -20,10 +30,40 @@ export function check(m: Mandate, e: Expect): string[] {
   const stores = m.checkout.allowed_merchants.map((s) => s.domain).sort();
   if (JSON.stringify(stores) !== JSON.stringify([...e.stores].sort())) problems.push(`stores [${stores}] ≠ expected [${e.stores}]`);
 
-  const features = norm(m.ext.must_haves.map((p) => `${p.attr} ${p.value} ${p.source_phrase ?? ""}`).join(" "));
-  for (const want of e.must_haves) {
-    const words = norm(want).split(" ").filter((w) => w !== "s");
-    if (!words.every((w) => features.includes(w))) problems.push(`must-have "${want}" missing`);
+  const has = (text: string, want: string) => norm(want).split(" ").filter((w) => w !== "s").every((w) => text.includes(w));
+  const prefText = (ps: { attr: string; value: string; source_phrase: string | null }[]) =>
+    norm(ps.map((p) => `${p.attr} ${p.value} ${p.source_phrase ?? ""}`).join(" "));
+
+  const features = prefText(m.ext.must_haves);
+  for (const want of e.must_haves) if (!has(features, want)) problems.push(`must-have "${want}" missing`);
+  for (const not of e.not_must_haves ?? []) if (has(features, not)) problems.push(`"${not}" made a hard must-have, but the shopper only asked to be asked`);
+
+  if (e.quantity !== undefined) {
+    const qty = m.checkout.line_items.reduce((s, li) => s + li.quantity, 0);
+    if (qty !== e.quantity) problems.push(`quantity ${qty} ≠ expected ${e.quantity}`);
+  }
+
+  const terms = prefText(m.ext.conditions_of_sale);
+  for (const want of e.conditions_of_sale ?? []) if (!has(terms, want)) problems.push(`condition of sale "${want}" missing`);
+
+  if (e.deliver_by !== undefined) {
+    const d = m.ext.deliver_by;
+    if (e.deliver_by === null && d) problems.push(`deadline "${d.date}" invented`);
+    if (e.deliver_by !== null && !(d && has(norm(`${d.date} ${d.source_phrase ?? ""}`), e.deliver_by))) problems.push(`deadline "${e.deliver_by}" missing`);
+  }
+
+  if (e.ship_to !== undefined) {
+    const t = m.ship_to;
+    if (e.ship_to === null && t) problems.push(`ship-to "${t.note}" invented`);
+    if (e.ship_to !== null && !(t && has(norm(`${t.note} ${t.source_phrase ?? ""}`), e.ship_to))) problems.push(`ship-to "${e.ship_to}" missing`);
+  }
+
+  if (e.exact_item !== undefined && (m.match_mode === "exact") !== e.exact_item)
+    problems.push(`exact item only ${m.match_mode === "exact"} ≠ expected ${e.exact_item}`);
+
+  if (e.substitute_asked !== undefined) {
+    const asked = m.ext.checkins.some((c) => c.type === "substitute" && c.source_phrase !== null);
+    if (asked !== e.substitute_asked) problems.push(`ask-before-substitute from the shopper's words ${asked} ≠ expected ${e.substitute_asked}`);
   }
 
   const got = new Set(findWarnings(m).map((w) => w.id));
@@ -38,6 +78,9 @@ export function check(m: Mandate, e: Expect): string[] {
     m.payment.amount_range.source_phrase,
     ...m.checkout.line_items.map((x) => x.source_phrase),
     ...m.ext.must_haves.map((x) => x.source_phrase),
+    ...m.ext.conditions_of_sale.map((x) => x.source_phrase),
+    m.ext.deliver_by?.source_phrase,
+    m.ship_to?.source_phrase,
     ...m.ext.checkins.map((x) => x.source_phrase),
     ...m.ext.unmapped.map((x) => x.phrase),
   ].filter((p): p is string => Boolean(p));
@@ -48,5 +91,5 @@ export function check(m: Mandate, e: Expect): string[] {
 
 // Problems that would mislead the shopper or overspend, not just a miss.
 export function isCritical(problem: string): boolean {
-  return /^max |^ask-above|not the shopper's exact words|^stores /.test(problem);
+  return /^max |^ask-above|not the shopper's exact words|^stores |^quantity /.test(problem);
 }

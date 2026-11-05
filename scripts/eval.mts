@@ -65,7 +65,7 @@ for (const model of config.models) {
       `${r.reduce((s, x) => s + x.input, 0)}/${r.reduce((s, x) => s + x.output, 0)}`,
   );
 }
-console.log("\nCritical = a wrong price limit or ask-above amount, a store the shopper didn't name, or words that aren't the shopper's own.");
+console.log("\nCritical = a wrong price limit, ask-above amount or quantity, a store the shopper didn't name, or words that aren't the shopper's own.");
 console.log("Real cost per model: run `ast billing models` on your Mac.");
 
 await mkdir(new URL("../data/eval/", import.meta.url), { recursive: true });

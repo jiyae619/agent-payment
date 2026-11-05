@@ -1,5 +1,5 @@
 // Drafts every synthetic request with Claude and checks the result against its `expect` block.
-// Run: npm run fixtures            (all 24; calls the Claude API, ~24 requests)
+// Run: npm run fixtures            (all 25; calls the Claude API, ~25 requests)
 //      npm run fixtures -- shoes-01 (one request)
 // Writes data/fixtures/last-run.json. Synthetic data: for testing the drafter, not user research.
 
