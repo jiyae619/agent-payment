@@ -11,7 +11,7 @@ agent:
 models:
   default:
     provider: gateway
-    models: [claude-haiku-4-5, claude-sonnet-4-6, claude-opus-5-5, gpt-5-6-luna, gpt-5-6-terra, nova-lite, nova-pro, mistral-large-3]
+    models: [claude-haiku-4-5, claude-sonnet-5, gpt-5-6-luna, nova-lite, mistral-large-3]
 
 dev:
   command: sh -c "node scripts/eval.mts; echo 'Eval finished. Press Ctrl+C to stop.'; sleep infinity"
