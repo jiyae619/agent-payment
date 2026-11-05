@@ -46,3 +46,6 @@ next-env.d.ts
 
 # Claude output from npm run fixtures (regenerated each run)
 /data/fixtures/last-run.json
+
+# Model eval results (npm run eval inside ast project start)
+/data/eval/
