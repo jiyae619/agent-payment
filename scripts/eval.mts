@@ -8,6 +8,7 @@ import { Draft, normalizeDraft } from "../lib/draft-schema.ts";
 import { DRAFT_SYSTEM } from "../lib/draft-prompt.ts";
 import { chatJSON } from "../lib/llm-gateway.ts";
 import { check, isCritical, type Req } from "./drafter-check.mts";
+import { passK } from "./pass-k.mts";
 
 type Config = { models: string[]; cases?: string[]; runs?: number; concurrency?: number };
 type Row = {
@@ -19,7 +20,7 @@ type Row = {
 const config: Config = JSON.parse(await readFile(new URL("../eval/config.json", import.meta.url), "utf8"));
 const fixtures = JSON.parse(await readFile(new URL("../data/fixtures/synthetic-requests.json", import.meta.url), "utf8"));
 const cases: Req[] = fixtures.requests.filter((r: Req) => !config.cases?.length || config.cases.includes(r.id));
-const runs = config.runs ?? 1;
+const runs = config.runs ?? 3; // pass^k needs repeats: a case counts only if every run passes
 
 const jobs = config.models.flatMap((model) => cases.flatMap((c) => Array.from({ length: runs }, (_, i) => ({ model, c, run: i + 1 }))));
 console.log(`Eval: ${config.models.length} model(s) × ${cases.length} case(s) × ${runs} run(s) = ${jobs.length} calls`);
@@ -49,26 +50,32 @@ await Promise.all(
   }),
 );
 
-// Scorecard: one line per model.
+// Scorecard: one line per model. pass^k counts cases right on every run; critical counts cases with a critical mistake on any run.
 const pct = (n: number, d: number) => (d ? `${Math.round((100 * n) / d)}%` : "-");
-console.log("\nmodel".padEnd(26) + "pass   critical  validJSON  enforced  avg s   tokens in/out");
+const summary: Record<string, ReturnType<typeof passK>> = {};
+console.log("\nmodel".padEnd(26) + `pass^${runs}`.padEnd(9) + "pass@1  critical  validJSON  enforced  avg s   tokens in/out");
 for (const model of config.models) {
   const r = rows.filter((x) => x.model === model);
+  const s = (summary[model] = passK(r));
   const avg = r.reduce((s, x) => s + x.ms, 0) / Math.max(1, r.length) / 1000;
   console.log(
     model.padEnd(25) +
-      pct(r.filter((x) => x.ok).length, r.length).padEnd(7) +
-      String(r.filter((x) => x.critical.length > 0).length).padEnd(10) +
+      `${s.passAll}/${s.cases}`.padEnd(9) +
+      pct(r.filter((x) => x.ok).length, r.length).padEnd(8) +
+      String(s.critical).padEnd(10) +
       pct(r.filter((x) => x.validJson).length, r.length).padEnd(11) +
       (r.some((x) => x.enforcedJson) ? "yes" : "no").padEnd(10) +
       avg.toFixed(1).padEnd(8) +
       `${r.reduce((s, x) => s + x.input, 0)}/${r.reduce((s, x) => s + x.output, 0)}`,
   );
 }
+for (const model of config.models)
+  if (summary[model].flaky.length) console.log(`Flaky on ${model} (passed some runs, failed others; read these first): ${summary[model].flaky.join(", ")}`);
+if (runs === 1) console.log(`One run per case can't show flaky cases. Set "runs": 3 in eval/config.json.`);
 console.log("\nCritical = a wrong price limit, ask-above amount, quantity or total budget, a hidden gift card, a store the shopper didn't name, or words that aren't the shopper's own.");
 console.log("Real cost per model: run `ast billing models` on your Mac.");
 
 await mkdir(new URL("../data/eval/", import.meta.url), { recursive: true });
 const out = new URL(`../data/eval/${new Date().toISOString().replace(/[:.]/g, "-")}.json`, import.meta.url);
-await writeFile(out, JSON.stringify({ config, rows }, null, 2) + "\n");
+await writeFile(out, JSON.stringify({ config, summary, rows }, null, 2) + "\n");
 console.log(`Saved ${out.pathname}`);
