@@ -7,6 +7,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { z } from "zod";
+import { listingText } from "../scripts/product-check-score.mts";
 
 const Listing = z.object({
   id: z.string(),
@@ -26,7 +27,7 @@ const Case = z.object({
   id: z.string(),
   trap: z.string().nullable(), // null = a plain pass
   requirement: z.object({
-    kind: z.enum(["must_have", "condition_of_sale", "quantity", "blocked_category"]), // new/used is a condition_of_sale, as in the mandate
+    kind: z.enum(["must_have", "condition_of_sale", "quantity", "blocked_category", "preference"]), // new/used is a condition_of_sale, as in the mandate; preference = asked softly
     attr: z.string(),
     value: z.string(),
     source_phrase: z.string().nullable(),
@@ -43,10 +44,6 @@ const Case = z.object({
 
 const raw = JSON.parse(readFileSync(new URL("../data/fixtures/product-checks.json", import.meta.url), "utf8"));
 const cases = z.array(Case).parse(raw.cases);
-
-// The text the checker may quote from: what the store says about the item.
-const listingText = (l: z.infer<typeof Listing>) =>
-  [l.title, l.description ?? "", ...l.key_features, ...Object.values(l.attributes), ...l.sizes, l.condition ?? ""].join("\n");
 
 test("every case parses, so a malformed label can't silently drop out of a model's score", () => {
   assert.equal(cases.length, raw.cases.length);
@@ -137,9 +134,15 @@ test("a listing that denies or contradicts the requirement is never 'checked', b
 });
 
 test("each common requirement has every verdict, so a model that always says one thing can't score perfectly", () => {
-  const attrs = ["free returns", "waterproof", "size", "pack size", "condition"];
+  const attrs = ["free returns", "waterproof", "size", "pack size", "condition", "scent"];
   for (const attr of attrs) {
     const got = new Set(cases.filter((c) => c.requirement.attr === attr).map((c) => c.expect.verdict));
     for (const v of ["checked", "didnt_match", "couldnt_check"]) assert.ok(got.has(v as never), `${attr} has no ${v} case`);
   }
+});
+
+test("soft preferences are never critical, because missing one never blocks the buy", () => {
+  const prefs = cases.filter((c) => c.requirement.kind === "preference");
+  assert.ok(prefs.length >= 3, "expected preference cases so the minor tier is tested");
+  for (const c of prefs) assert.equal(c.expect.critical_if_wrong, false, c.id);
 });

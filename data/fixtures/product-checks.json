@@ -1,6 +1,6 @@
 {
   "_note": "Labels written by Claude for testing the evidence checker. Not user research.",
-  "_expect": "trap: what makes the case hard (null = a plain pass). verdict: checked only when the listing text states the requirement (quote is an exact, whole-word substring of title + description + key_features + attribute values + sizes + condition); didnt_match when the listing contradicts it; couldnt_check when it is silent or only loosely related. For kind quantity, the checker judges whether one unit of the listing is the unit the shopper counted. critical_if_wrong: a wrong 'checked' on this case breaks the shopper's trust. final_sale: the listing says it can't be returned. Quotes shorter than 6 characters must be a whole field (a size, the condition). One listing can carry several requirements; each is its own case. Channel3 listings (source channel3) are trimmed excerpts of the Nov 5 snapshot: only attributes the case needs are kept.",
+  "_expect": "trap: what makes the case hard (null = a plain pass). verdict: checked only when the listing text states the requirement (quote is the shortest exact, whole-word wording that proves it, taken from title + description + key_features + attribute values + sizes + condition); didnt_match when the listing contradicts it; couldnt_check when it is silent or only loosely related. For kind quantity, the checker judges whether one unit of the listing is the unit the shopper counted. critical_if_wrong: a wrong 'checked' on this case breaks the shopper's trust. kind preference: the shopper asked softly (\"if they have it\"), so missing it never blocks the buy and mistakes score one level lower; every other kind is required. final_sale: the listing says it can't be returned. Quotes shorter than 6 characters must be a whole field (a size, the condition). One listing can carry several requirements; each is its own case. Channel3 listings (source channel3) are trimmed excerpts of the Nov 5 snapshot: only attributes the case needs are kept.",
   "cases": [
     {
       "id": "returns-energy-trap-01",
@@ -236,7 +236,7 @@
       },
       "expect": {
         "verdict": "checked",
-        "quote": "Free returns within 30 days of delivery",
+        "quote": "Free returns",
         "final_sale": false,
         "critical_if_wrong": false,
         "why": "The listing states the store's free-returns terms in plain words."
@@ -312,7 +312,7 @@
       },
       "expect": {
         "verdict": "checked",
-        "quote": "Waterproof (no warranty)",
+        "quote": "Waterproof",
         "final_sale": false,
         "critical_if_wrong": false,
         "why": "The store's structured attributes state waterproof directly, even though the prose does not."
@@ -345,7 +345,7 @@
       },
       "expect": {
         "verdict": "checked",
-        "quote": "Waterproof Trail Running Shoes",
+        "quote": "Waterproof",
         "final_sale": false,
         "critical_if_wrong": false,
         "why": "The product title itself states waterproof, which is the store's own claim about the item."
@@ -394,7 +394,7 @@
       },
       "expect": {
         "verdict": "checked",
-        "quote": "offering waterproof protection",
+        "quote": "waterproof protection",
         "final_sale": false,
         "critical_if_wrong": false,
         "why": "The description states waterproof protection directly, and the attributes agree."
@@ -735,7 +735,7 @@
       },
       "expect": {
         "verdict": "checked",
-        "quote": "This 54 fl oz (1.59 L) refill bottle",
+        "quote": "refill bottle",
         "final_sale": false,
         "critical_if_wrong": false,
         "why": "One unit is one bottle, so 3 in the cart is 3 bottles; \"refills 3X\" is about refilling, not a 3-pack."
@@ -805,7 +805,7 @@
       },
       "expect": {
         "verdict": "checked",
-        "quote": "30 pre-measured pods",
+        "quote": "30 Pods",
         "final_sale": false,
         "critical_if_wrong": false,
         "why": "The description states the pack holds 30 pods."
@@ -1275,7 +1275,7 @@
       },
       "expect": {
         "verdict": "checked",
-        "quote": "Momentum Mens Waterproof Trail Running Shoes",
+        "quote": "Trail Running Shoes",
         "final_sale": false,
         "critical_if_wrong": false,
         "why": "The title shows a pair of shoes, not a gift card or other blocked item."
@@ -1317,6 +1317,157 @@
         "final_sale": false,
         "critical_if_wrong": true,
         "why": "Only women's sizes are listed, and \"W 8\" is not a men's 8; the listing gives no men's conversion."
+      }
+    },
+    {
+      "id": "pref-scent-pass-01",
+      "trap": "preference",
+      "requirement": {
+        "kind": "preference",
+        "attr": "scent",
+        "value": "citrus",
+        "source_phrase": "citrus scent if they have it"
+      },
+      "listing": {
+        "id": "roCUaP1",
+        "title": "Laundry Detergent Pods",
+        "brand": "Laundry Sauce",
+        "store": "ulta.com",
+        "price": 37,
+        "description": "Performance liquid laundry detergent pods infused with Italian Bergamot fragrance. Ultra-concentrated pre-measured 22mL pods powered with bio-enzymes to tackle stains, revitalize fabrics, and leave clothes with a luxurious scent. Packaging features a bold orange design.",
+        "key_features": [
+          "Make laundry day the best day of the week with our Performance Liquid Laundry Detergent Pods.",
+          "Crafted in collaboration with the world's top perfumers",
+          "Ultra-concentrated, pre-measured 22mL pods",
+          "Powered with bio-enzymes to tackle stains and revitalize fabrics",
+          "Luxurious scent"
+        ],
+        "attributes": {
+          "scent": "Citrus"
+        },
+        "sizes": [],
+        "condition": "new",
+        "source": "channel3"
+      },
+      "expect": {
+        "verdict": "checked",
+        "quote": "Citrus",
+        "final_sale": false,
+        "critical_if_wrong": false,
+        "why": "The store's scent attribute says Citrus."
+      }
+    },
+    {
+      "id": "pref-scent-mismatch-01",
+      "trap": "preference",
+      "requirement": {
+        "kind": "preference",
+        "attr": "scent",
+        "value": "citrus",
+        "source_phrase": "citrus scent if they have it"
+      },
+      "listing": {
+        "id": "tOEXRu1",
+        "title": "Williams Sonoma Fleur de Sel Dish Soap Refill",
+        "brand": "Sangoma",
+        "store": "williams-sonoma.com",
+        "price": 49.95,
+        "description": "Our light floral fragrance captures the invigorating freshness of a seaside meadow. Our dish soap is scented with premium essential oils and essences, phthalate‑free, not tested on animals, and made in a 68‑fl.‑oz. refill bottle of 100 % post‑consumer recycled (PCR) plastic.",
+        "key_features": [
+          "68‑fl‑oz. refill size",
+          "Scented with premium essential oils and essences",
+          "Phthalate‑free",
+          "Not tested on animals",
+          "Contains soapbark extract, a natural degreaser",
+          "Refill bottle made of 100 % post‑consumer recycled (PCR) plastic",
+          "Developed exclusively for Williams Sonoma"
+        ],
+        "attributes": {
+          "scent": "Floral",
+          "fragrance": "Floral"
+        },
+        "sizes": [],
+        "condition": "new",
+        "source": "channel3"
+      },
+      "expect": {
+        "verdict": "didnt_match",
+        "quote": "Floral",
+        "final_sale": false,
+        "critical_if_wrong": false,
+        "why": "The store gives the scent as Floral, not citrus."
+      }
+    },
+    {
+      "id": "pref-scent-mismatch-02",
+      "trap": "preference",
+      "requirement": {
+        "kind": "preference",
+        "attr": "scent",
+        "value": "citrus",
+        "source_phrase": "citrus scent if they have it"
+      },
+      "listing": {
+        "id": "lU73pkK",
+        "title": "Power Pods Oxi Max Laundry Detergent Pods",
+        "brand": "Tide",
+        "store": "menards.com",
+        "price": 12.97,
+        "description": "Tide Power Pods Oxi Max are powerful laundry detergent pods designed to remove tough, set-in stains like ketchup, dirt, and BBQ sauce without the need for pretreating. These pods dissolve even in cold water, leaving zero residue while ensuring clothes come out clean, fresh, and stain-free. Simply toss one or two pods into the washer before adding laundry for convenient, high-strength cleaning.",
+        "key_features": [
+          "Dissolves even in cold water, leaving behind zero laundry detergent residue",
+          "Removes toughest stains without pretreating",
+          "Clothes come out looking and smelling clean, fresh, and stain-free",
+          "Convenient and easy to use"
+        ],
+        "attributes": {
+          "scent": "Fresh"
+        },
+        "sizes": [],
+        "condition": "new",
+        "source": "channel3"
+      },
+      "expect": {
+        "verdict": "didnt_match",
+        "quote": "Fresh",
+        "final_sale": false,
+        "critical_if_wrong": false,
+        "why": "The store gives the scent as Fresh, not citrus."
+      }
+    },
+    {
+      "id": "pref-scent-brand-name-01",
+      "trap": "preference",
+      "requirement": {
+        "kind": "preference",
+        "attr": "scent",
+        "value": "citrus",
+        "source_phrase": "citrus scent if they have it"
+      },
+      "listing": {
+        "id": "demo-20-pods",
+        "title": "Citrus Grove Laundry Detergent Pods - 20 Pods",
+        "brand": "Citrus Grove",
+        "store": "homegoods-direct.example",
+        "price": 9.99,
+        "description": "Concentrated laundry pods that dissolve in cold water. One box of 20 pods.",
+        "key_features": [
+          "20 pods per box",
+          "Dissolves in cold water"
+        ],
+        "attributes": {
+          "chemical-product-form": "Tablets"
+        },
+        "sizes": [],
+        "condition": "new",
+        "source": "hand-made"
+      },
+      "expect": {
+        "verdict": "couldnt_check",
+        "quote": null,
+        "final_sale": false,
+        "critical_if_wrong": false,
+        "why": "\"Citrus Grove\" is the brand name, not a scent, and the listing never says what the pods smell like."
       }
     }
   ]
