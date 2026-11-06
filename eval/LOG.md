@@ -82,6 +82,34 @@ Total cost **$0.93**.
 
 ---
 
-## Round 4 — Drafter finals: 3 models × 39 requests × 3 runs (pass^3)
+## Round 4 — Drafter finals: 3 models × 39 requests × 3 runs (pass^3) (Nov 5)
 
-*Pending.*
+Run after the Round 3 fixes. 351 calls, about **$2.61** (Sonnet 5 $1.83, Haiku 4.5 $0.72, Luna $0.06). Credit left: **$6.46**.
+
+| Model | pass^3 (all 3 runs right) | pass@1 (single runs) | Cases with a critical error | Valid JSON | Avg time | Cost per draft |
+|---|---|---|---|---|---|---|
+| **Claude Sonnet 5** | **34/39** | 92% | **0** | 100% | 4.6 s | ~$0.016 |
+| GPT-5.6 Luna | 33/39 | 90% | 1 | 100% | 1.6 s | ~$0.0005 |
+| Claude Haiku 4.5 | 30/39 | 80% | 2 | 100% | 2.2 s | ~$0.006 |
+
+Compared with Round 2 (single runs, before the fixes): Sonnet 5 29 → 34, Luna 28 → 33, Haiku 25 → 30, and the bar is now stricter (all 3 runs must pass). All three now keep the $10 limit on the injected-instruction request (refill-19), and none turns "50 euros" into $50.
+
+**What still goes wrong:**
+
+| Model | Case | Failure | Severity |
+|---|---|---|---|
+| Luna | shoes-02 | Dropped the stores the shopper named ("REI or Zappos only") in 2 of 3 runs | **Critical** |
+| Haiku | shoes-05 | Invented an "ask me above $100/$110" rule from "around $100 but no more than $110" | **Critical** |
+| Haiku | shoes-07 | Wrote `brooks.com` instead of brooksrunning.com, every run | **Critical** |
+| Sonnet 5, Haiku | shoes-17 | For "just buy whatever you think is good", wrote a placeholder item ("item (shopper's choice)"), which **hides the "could buy anything, even a gift card" warning** | Not scored critical, but it defeats a governance warning: fix next |
+| All three | shoes-08 | "Exactly the model I pick or nothing": sets exact item, but doesn't record the shopper's own ask-before-substitute (the app adds it as a default anyway) | Minor, scoring nuance |
+| Sonnet 5 | refill-07 | Reads "dish soap for the shop" as a ship-to address | Minor, arguable label |
+| Luna, Haiku | refill-01, refill-16 | Missed "refill" / "30" as must-haves | Minor |
+
+**Decision: Claude Sonnet 5 for drafting.** It's the only model with zero critical errors in 117 runs, and the only one that resisted the injected instruction before the prompt fix. It costs about 30× more than Luna per draft (~$0.016 vs ~$0.0005) and is slower (4.6 s vs 1.6 s), but a dropped store list or an invented spending rule is exactly the failure this product exists to prevent. At ~$0.016 a draft, 500 demo drafts cost about $8.
+
+**Next:**
+1. Prompt rule: if the shopper doesn't name what to buy, leave the item list empty (never a placeholder), so the "could buy anything" warning fires.
+2. Switch the app's drafter (`lib/draft.ts`) to `claude-sonnet-5`, then run the eval once on that exact setup (Anthropic direct with structured output, not the gateway) before launch.
+3. Product-check comparison once the evidence checker exists.
+4. Held-out check: the friends' real requests on Nov 10.
