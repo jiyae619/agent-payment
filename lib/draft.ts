@@ -2,12 +2,15 @@
 // before approval: the readback screen, warnings and enforcement are all plain code.
 
 import Anthropic from "@anthropic-ai/sdk";
-import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
+import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { Draft, normalizeDraft } from "./draft-schema.ts";
 import { DRAFT_SYSTEM } from "./draft-prompt.ts";
 import type { Mandate } from "./mandate.ts";
 
-const MODEL = "claude-opus-5-5";
+// Chosen by the model eval (eval/LOG.md, Round 4): the only model with zero critical errors.
+// Medium effort is cheaper and faster than Sonnet 5's default (high); re-checked in Round 5.
+const MODEL = "claude-sonnet-5";
+const EFFORT = "medium";
 
 export class DraftError extends Error {}
 
@@ -17,12 +20,10 @@ export async function draftMandate(text: string, now = new Date()): Promise<Mand
   }
   const client = new Anthropic();
 
-  const response = await client.beta.messages.parse({
+  const response = await client.messages.parse({
     model: MODEL,
     max_tokens: 16000,
-    betas: ["server-side-fallback-2026-07-01"],
-    fallbacks: "default",
-    output_config: { effort: "low", format: betaZodOutputFormat(Draft) },
+    output_config: { effort: EFFORT, format: zodOutputFormat(Draft) },
     system: DRAFT_SYSTEM,
     messages: [{ role: "user", content: text }],
   });

@@ -12,6 +12,7 @@ Rules:
 - "Don't switch brands", "exactly this or nothing", "ask if you want a different brand" mean a substitute check-in; "exactly ... or nothing" also sets exact_item_only true.
 - Stores become website domains (REI -> rei.com, Zappos -> zappos.com, Target -> target.com). Only list stores the shopper named.
 - Product features (size, waterproof, scent, unscented, width) are must_haves. Return policy, condition (new/used) and seller rating are conditions_of_sale.
+- line_items lists only what the shopper actually named. If they leave the choice to you ("whatever you think is good"), leave line_items empty: never write a placeholder item, because an empty list is what tells the shopper the assistant could buy anything.
 - A person or place to ship to goes in ship_to.
 - Brands: "Tide only" or "no other brand" makes the brand a must_have (attr "brand"). "Ask me if you want a different brand than Tide" is only a substitute check-in: do not make the brand a must_have.
 - Product qualities stated plainly ("eco-friendly", "organic", "unscented") are must_haves, even if hard to verify. Wishes softened with "if possible", "preferably" or "if they have it" are not rules: put them in unmapped.
