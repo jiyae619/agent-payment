@@ -87,9 +87,13 @@ export function findWarnings(m: Mandate, now = new Date()): Warning[] {
   }
 
   const text = m.source_text.toLowerCase();
+  const words = text.match(/[a-z0-9]+/g) ?? [];
   for (const s of m.checkout.allowed_merchants) {
-    const name = s.domain.replace(/^www\./, "").split(".")[0];
-    if (!text.includes(name)) {
+    const name = s.domain.replace(/^www\./, "").split(".")[0].replace(/[^a-z0-9]/g, "");
+    // A store counts as named if its site name appears, or the shopper used its brand:
+    // "Brooks" names brooksrunning.com. Short words ("the") are too loose to count.
+    const named = text.includes(name) || words.some((w) => w.length >= 4 && name.startsWith(w));
+    if (!named) {
       warnings.push({
         id: "store_not_named",
         message: `You didn't mention ${s.domain}.`,

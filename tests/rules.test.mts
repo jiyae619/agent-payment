@@ -106,6 +106,15 @@ test("a store the shopper never mentioned is flagged", () => {
   assert.equal(ids("shoes from REI only, under 120", named).includes("store_not_named"), false);
 });
 
+test("a store named by its brand isn't flagged: 'Brooks' names brooksrunning.com (found in the Nov 5 eval)", () => {
+  const text = "Only buy from Nike or Brooks directly. Size 9.5 road shoes, under $140.";
+  const d = shoesDraft({ stores: [{ domain: "nike.com", source_phrase: "Nike" }, { domain: "brooksrunning.com", source_phrase: "Brooks" }] });
+  assert.equal(ids(text, d).includes("store_not_named"), false);
+  // A brand-like word must still be the start of the store's name, so an unrelated store stays flagged.
+  const other = shoesDraft({ stores: [{ domain: "runningwarehouse.com", source_phrase: null }] });
+  assert.ok(ids(text, other).includes("store_not_named"));
+});
+
 test("safe defaults: it asks before substitutes and unnamed stores unless the shopper said otherwise", () => {
   const m = normalizeDraft(shoesDraft(), shoesText, NOW);
   assert.deepEqual(m.ext.checkins.map((c) => c.type).sort(), ["new_store", "over_amount", "substitute"]);
