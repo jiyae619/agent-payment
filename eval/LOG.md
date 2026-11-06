@@ -120,7 +120,7 @@ Compared with Round 2 (single runs, before the fixes): Sonnet 5 29 → 34, Luna 
 
 | Change | Why |
 |---|---|
-| App drafter (`lib/draft.ts`): **Claude Opus 5.5 → Claude Sonnet 5** | Opus 5.5 had been set on Nov 6 before any eval existed, and was never tested. Sonnet 5 is the eval winner (0 critical errors in 117 runs) at half Opus 5.5's price per token, so the demo now runs the model that was measured |
+| App drafter (`lib/draft.ts`): **Claude Opus 5.5 → Claude Sonnet 5** | Opus 5.5 had been set when the drafter was first built (the plan's "Nov 6" step, done Nov 4), before any eval existed, and was never tested. Sonnet 5 is the eval winner (0 critical errors in 117 runs) at half Opus 5.5's price per token, so the demo now runs the model that was measured |
 | Effort **medium** (Sonnet 5's default is high) | Owner's choice: cheaper and faster per draft. The eval ran Sonnet 5 at its default (high), so this is a slightly different setup: **must be re-checked** |
 | Removed server-side fallbacks (`fallbacks: "default"`) | Documented only for Opus 5.5, Opus 5, Sonnet 5.5 and Fable 5.1, not Sonnet 5. Refusals are still caught and shown to the shopper |
 | Prompt rule: never write a placeholder item; leave the item list empty when the shopper leaves the choice open | Round 4 shoes-17: "item (shopper's choice)" hid the "could buy anything, even a gift card" warning |
