@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "typecheck": "next typegen && tsc --noEmit",
     "catalog": "node --env-file=.env.local scripts/build-catalog.mts",
     "check-schema": "node scripts/check-schema.mts",
     "check-search": "node --env-file=.env.local scripts/check-search.mts",

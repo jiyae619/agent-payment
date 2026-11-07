@@ -13,7 +13,8 @@
 //
 // A model passes the gate only with zero critical mistakes; survivors rank by major, then minor.
 
-export type Verdict = "checked" | "didnt_match" | "couldnt_check";
+import type { Verdict } from "../lib/enforce.ts"; // one definition, shared with the enforcement service
+
 export type Severity = "critical" | "major" | "minor";
 export type Answer = { verdict: Verdict; quote: string | null };
 
