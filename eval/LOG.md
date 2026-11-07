@@ -126,3 +126,28 @@ Compared with Round 2 (single runs, before the fixes): Sonnet 5 29 → 34, Luna 
 | Prompt rule: never write a placeholder item; leave the item list empty when the shopper leaves the choice open | Round 4 shoes-17: "item (shopper's choice)" hid the "could buy anything, even a gift card" warning |
 
 **Still to verify before launch:** run the 39 requests × 3 runs on the exact app setup (Anthropic API directly, structured output, Sonnet 5 at medium effort, this prompt). Needs `ANTHROPIC_API_KEY` in `.env.local`; roughly 117 calls, about $1–2 on that key. Pass bar: zero critical errors, and shoes-17 now raises the "could buy anything" warning.
+
+---
+
+## Round 6 — Re-check on the app's exact setup (Nov 7)
+
+Anthropic API directly (not the gateway), structured output, Claude Sonnet 5 at **medium** effort, the Round 5 prompt. 39 requests × 3 runs = 117 calls on the Anthropic key. `npm run fixtures -- --runs=3` (the runner gained a `--runs` option and the same pass^k summary as the eval).
+
+| Setup | pass^3 | pass@1 (single runs) | Cases with a critical error | Avg time |
+|---|---|---|---|---|
+| Round 4: gateway, **high** effort | 34/39 | 92% | 0 | 4.6 s |
+| Round 6: app path, **medium** effort | 33/39 | 91% (106/117) | **2** | 3.8 s |
+
+**What went wrong, and what was checked:**
+
+| Case | Failure | Same case at **high** effort on the app path (3 runs each) | Cause | Fix |
+|---|---|---|---|---|
+| shoes-07 | Wrote `brooks.com` instead of brooksrunning.com in 2 of 3 runs (**critical**: the real store is blocked and an unnamed site is allowed; the `store_not_named` warning can't catch it because "brooks" is in the request) | 3/3 pass | **Medium effort** | Owner's decision: go back to high effort, or keep medium and accept this |
+| refill-16 | "a 30-pack of tide pods" became **quantity 30** in 1 of 3 runs (critical, though the $15 limit would still stop the charge) | Still wrong in 1 of 3 runs | **Prompt gap**, not effort | New rule: a pack size is one item (quantity 1, pack size as a must-have). Re-test at medium: refill-16 and refill-01 3/3 each |
+| shoes-17 | Round 5's fix confirmed: the item list is empty in 3/3 runs, so the "could buy anything" warning fires. Run 3 failed on a different, minor point (didn't list "whatever you think is good" as can't-promise) | — | — | — |
+
+Still minor and flaky: refill-07 (the "shop" as ship-to), shoes-08 (ask-before-substitute from the shopper's words; the app adds it by default).
+
+Cost: about 130 calls on the Anthropic key (the full run, the high-effort check and the pack-size re-test), well under $3.
+
+**Caution:** the pack-size rule was found and re-tested on the same requests, so it's another optimistic result; the friends' requests on Nov 10 are the held-out check.

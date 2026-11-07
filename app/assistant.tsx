@@ -26,12 +26,15 @@ export default function Assistant() {
   const [dismissed, setDismissed] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  // Sealed by the server once the shopper approves; the shopping step will send it back.
+  const [approval, setApproval] = useState<{ token: string; payer: string } | null>(null);
 
   async function readBack() {
     setLoading(true);
     setError(null);
     setMandate(null);
     setDismissed([]);
+    setApproval(null);
     try {
       const res = await fetch("/api/draft", {
         method: "POST",
@@ -100,21 +103,55 @@ export default function Assistant() {
             if (w.fix) setMandate(applyFix(mandate, w.fix.action));
           }}
           onKeep={(w) => setDismissed((d) => [...d, w.id + w.message])}
+          approval={approval}
+          onApproved={(token, payer, approved) => {
+            setMandate(approved);
+            setApproval({ token, payer });
+          }}
         />
       )}
     </main>
   );
 }
 
-function Readback(props: { mandate: Mandate; dismissed: string[]; onFix: (w: Warning) => void; onKeep: (w: Warning) => void }) {
-  const { mandate } = props;
+function Readback(props: {
+  mandate: Mandate;
+  dismissed: string[];
+  onFix: (w: Warning) => void;
+  onKeep: (w: Warning) => void;
+  approval: { token: string; payer: string } | null;
+  onApproved: (token: string, payer: string, mandate: Mandate) => void;
+}) {
+  const { mandate, approval } = props;
+  const [approving, setApproving] = useState(false);
+  const [approveError, setApproveError] = useState<string | null>(null);
   const rows = useMemo(() => readbackRows(mandate), [mandate]);
   const warnings = useMemo(
     () => findWarnings(mandate).filter((w) => !props.dismissed.includes(w.id + w.message)),
     [mandate, props.dismissed],
   );
   const max = mandate.payment.amount_range.max;
-  const current = warnings[0];
+  // Once approved, the instructions are sealed: no more one-tap changes.
+  const current = approval ? undefined : warnings[0];
+
+  async function approve() {
+    setApproving(true);
+    setApproveError(null);
+    try {
+      const res = await fetch("/api/approve", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mandate }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error ?? "PayPal approval didn't go through. Please try again.");
+      props.onApproved(data.approval, data.payer, data.mandate);
+    } catch (err) {
+      setApproveError((err as Error).message);
+    } finally {
+      setApproving(false);
+    }
+  }
 
   return (
     <section className="mt-10" aria-live="polite">
@@ -174,12 +211,36 @@ function Readback(props: { mandate: Mandate; dismissed: string[]; onFix: (w: War
       </details>
 
       <div className="mt-8">
-        <button type="button" disabled className="w-full rounded-xl bg-[#0070ba] px-5 py-4 text-lg font-medium text-white opacity-50 sm:w-auto">
-          {max !== null ? `Hold up to $${max} with PayPal` : "Continue with PayPal"}
-        </button>
-        <p className="mt-2 text-sm text-zinc-500">
-          You&apos;re only charged if everything checks out. Otherwise the hold is released. (Approving with PayPal is the next build step.)
-        </p>
+        {approval ? (
+          <div role="status" className="rounded-xl border-2 border-emerald-500 bg-emerald-50 p-4 dark:bg-emerald-950">
+            <p className="text-lg font-semibold">✓ Approved with PayPal</p>
+            <p className="mt-1">
+              It can now shop within these limits, paying with <span className="font-medium">{approval.payer}</span>. Nothing is charged
+              yet: PayPal holds the money only once it finds the item, and you&apos;re only charged if everything checks out.
+            </p>
+          </div>
+        ) : (
+          <>
+            <button
+              type="button"
+              onClick={approve}
+              disabled={approving || max === null}
+              className="w-full rounded-xl bg-[#0070ba] px-5 py-4 text-lg font-medium text-white hover:bg-[#005ea6] disabled:opacity-50 sm:w-auto"
+            >
+              {approving ? "Connecting to PayPal…" : max !== null ? `Approve up to $${max} with PayPal` : "Approve with PayPal"}
+            </button>
+            <p className="mt-2 text-sm text-zinc-500">
+              {max === null
+                ? "Say how much it can spend first, for example \"under $50\"."
+                : "You're only charged if everything checks out. Otherwise PayPal releases the money."}
+            </p>
+            {approveError && (
+              <p role="alert" className="mt-3 rounded-lg bg-red-50 p-3 text-red-900 dark:bg-red-950 dark:text-red-100">
+                {approveError}
+              </p>
+            )}
+          </>
+        )}
       </div>
     </section>
   );

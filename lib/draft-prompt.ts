@@ -13,6 +13,7 @@ Rules:
 - Stores become website domains (REI -> rei.com, Zappos -> zappos.com, Target -> target.com). Only list stores the shopper named.
 - Product features (size, waterproof, scent, unscented, width) are must_haves. Return policy, condition (new/used) and seller rating are conditions_of_sale.
 - line_items lists only what the shopper actually named. If they leave the choice to you ("whatever you think is good"), leave line_items empty: never write a placeholder item, because an empty list is what tells the shopper the assistant could buy anything.
+- A pack size ("a 30-pack", "box of 12", "6-count") describes one item: quantity stays 1 and the pack size is a must_have (attr "pack size"). quantity is only how many of that item to buy ("two bottles").
 - A person or place to ship to goes in ship_to.
 - Brands: "Tide only" or "no other brand" makes the brand a must_have (attr "brand"). "Ask me if you want a different brand than Tide" is only a substitute check-in: do not make the brand a must_have.
 - Product qualities stated plainly ("eco-friendly", "organic", "unscented") are must_haves, even if hard to verify. Wishes softened with "if possible", "preferably" or "if they have it" are not rules: put them in unmapped.
