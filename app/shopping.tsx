@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from "react";
 import type { CatalogProduct } from "@/lib/catalog.ts";
 import type { CheckResult, Decision } from "@/lib/enforce.ts";
 import type { Policy } from "@/lib/policy.ts";
+import { RATING_TEXT, REASON_TEXT, recordEntry, updateEntry, type DontBuyReason, type Outcome, type Rating } from "@/lib/history.ts";
 import type { FunnelStep } from "@/lib/shortlist.ts";
 
 type Step = { step: string; text: string; count?: number };
@@ -50,7 +51,23 @@ function saveProof(proof: unknown, seal: string, orderId: string) {
   URL.revokeObjectURL(url);
 }
 
-export default function Shopping({ approval, onEdit }: { approval: string; onEdit: () => void }) {
+// The final outcome of a run, for the shopper's history: bought, released by the rules, or refused by them.
+function outcomeOf(r: ShopResult): Outcome | null {
+  if (r.outcome === "bought") return "bought";
+  if (r.outcome === "released") return r.decision?.action === "ask" ? "refused" : "released";
+  return null;
+}
+
+function sendFeedback(kind: "dont_buy_reason" | "rating", value: string, r: ShopResult, outcome: Outcome) {
+  const asked = r.decision?.action === "ask" ? r.decision.checkins.map((c) => c.rule) : [];
+  void fetch("/api/feedback", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ kind, value, store: r.pick?.product.store, outcome, asked_because: asked }),
+  }).catch(() => {});
+}
+
+export default function Shopping({ approval, request, item, onEdit }: { approval: string; request: string; item: string; onEdit: () => void }) {
   const [steps, setSteps] = useState<Step[]>([]);
   const [result, setResult] = useState<ShopResult | null>(null);
   const [running, setRunning] = useState(false);
@@ -112,9 +129,28 @@ export default function Shopping({ approval, onEdit }: { approval: string; onEdi
     setBusy(a);
     const res = await fetch("/api/shop/answer", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pending: result.pending, answer: a }) });
     const r = await res.json().catch(() => ({ error: "Something went wrong. Nothing changed." }));
-    setResult({ ...result, ...r, pending: r.error ? result.pending : undefined, outcome: r.outcome ?? result.outcome });
+    setResult({ ...result, ...r, paypal: { ...result.paypal, ...r.paypal }, pending: r.error ? result.pending : undefined, outcome: r.outcome ?? result.outcome });
     setBusy(null);
   }
+
+  // Save each finished purchase to the shopper's history (their browser only).
+  const outcome = result ? outcomeOf(result) : null;
+  const orderId = result?.paypal?.orderId;
+  useEffect(() => {
+    if (!result || !outcome || !orderId || !result.pick) return;
+    recordEntry({
+      id: orderId,
+      at: new Date().toISOString(),
+      request,
+      item,
+      product: result.pick.product.title,
+      store: result.pick.product.store,
+      amount: result.pick.total ?? result.pick.product.price,
+      outcome,
+      asked_because: result.decision?.action === "ask" ? result.decision.checkins.map((c) => c.rule) : undefined,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orderId, outcome]);
 
   const held = steps.some((s) => s.step === "hold");
 
@@ -179,8 +215,48 @@ export default function Shopping({ approval, onEdit }: { approval: string; onEdi
   return (
     <>
       <Picked result={result} busy={busy} onAnswer={answer} onEdit={onEdit} />
+      {outcome === "refused" && orderId && (
+        <Ask<DontBuyReason>
+          question="Why not? (optional)"
+          options={REASON_TEXT}
+          onPick={(v) => {
+            updateEntry(orderId, { reason: v });
+            sendFeedback("dont_buy_reason", v, result, "refused");
+          }}
+        />
+      )}
       {result.outcome === "bought" && <Done result={result} />}
+      {result.outcome === "bought" && orderId && (
+        <Ask<Rating>
+          question="Was this right?"
+          options={RATING_TEXT}
+          onPick={(v) => {
+            updateEntry(orderId, { rating: v });
+            sendFeedback("rating", v, result, "bought");
+          }}
+        />
+      )}
     </>
+  );
+}
+
+// One optional question with a few answers. Answers go to the shopper's history and become
+// suggestions they can accept next time; they never change a limit by themselves.
+function Ask<T extends string>({ question, options, onPick }: { question: string; options: Record<T, string>; onPick: (v: T) => void }) {
+  const [picked, setPicked] = useState<T | null>(null);
+  return (
+    <section className="sheet" aria-live="polite">
+      <span className="step">{question}</span>
+      {picked ? (
+        <p className="sub">Saved to your history on this device. Next time it can suggest a change, and you decide.</p>
+      ) : (
+        <div className="starters">
+          {(Object.keys(options) as T[]).map((k) => (
+            <button key={k} type="button" className="starter" onClick={() => { setPicked(k); onPick(k); }}>{options[k]}</button>
+          ))}
+        </div>
+      )}
+    </section>
   );
 }
 

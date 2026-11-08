@@ -104,7 +104,9 @@ export default function Assistant() {
         />
       )}
 
-      {mandate && approval && !editing && <Shopping key={approval} approval={approval} onEdit={edit} />}
+      {mandate && approval && !editing && (
+        <Shopping key={approval} approval={approval} request={mandate.source_text} item={mandate.checkout.line_items[0]?.description ?? "anything"} onEdit={edit} />
+      )}
       <AttackDemo />
     </main>
   );
