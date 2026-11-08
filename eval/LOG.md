@@ -153,3 +153,16 @@ Cost: about 130 calls on the Anthropic key (the full run, the high-effort check 
 **Caution:** the pack-size rule was found and re-tested on the same requests, so it's another optimistic result; the friends' requests on Nov 10 are the held-out check.
 
 **Decision (Nov 7): back to high effort.** Owner's call after Round 6: the wrong-store error at medium is the failure this product exists to prevent, and high costs about 1 s more per draft. `lib/draft.ts` now uses `effort: "high"`, the setup that scored 0 critical errors in Round 4 and 3/3 on shoes-07 here.
+
+---
+
+## Not yet evaluated (Nov 7)
+
+The shopping step now calls two more AI steps, both on placeholder settings until they get their own comparison:
+
+| Step | File | Setting for now | Guard around it (plain code) |
+|---|---|---|---|
+| Product checker | `lib/check-product.ts` (prompt in `lib/check-prompt.ts`) | Claude Sonnet 5, high effort | Every "checked" or "didn't match" must quote words found in the listing or the store's policy; otherwise it becomes "couldn't check" |
+| Pick | `lib/pick.ts` | Claude Sonnet 5, low effort | Only sees products that passed every filter; an answer naming no listed product is ignored; enforcement re-checks the pick |
+
+Next: run the 37 product-check cases (`data/fixtures/product-checks.json`) against the checker prompt for a few models, scored by `scripts/product-check-score.mts`.

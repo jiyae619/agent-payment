@@ -18,19 +18,27 @@ function secret(): string {
 
 const sign = (payload: string) => createHmac("sha256", secret()).update(payload).digest("base64url");
 
-export function sealApproval(approval: Approval): string {
-  const payload = Buffer.from(JSON.stringify(approval)).toString("base64url");
+// Any server-made data the browser carries between steps (the approval, a purchase waiting for the
+// shopper's answer) is sealed the same way.
+export function seal(data: unknown): string {
+  const payload = Buffer.from(JSON.stringify(data)).toString("base64url");
   return `${payload}.${sign(payload)}`;
 }
 
-export function openApproval(token: string): Approval {
-  const [payload, mac] = token.split(".");
+export function unseal(token: string): unknown {
+  const [payload, mac] = String(token).split(".");
   if (!payload || !mac) throw new ApprovalError("This approval is not valid.");
   const expected = Buffer.from(sign(payload));
   const given = Buffer.from(mac);
   if (expected.length !== given.length || !timingSafeEqual(expected, given)) {
     throw new ApprovalError("This approval was changed after you approved it, so it can't be used.");
   }
-  const data = JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
+  return JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
+}
+
+export const sealApproval = (approval: Approval): string => seal(approval);
+
+export function openApproval(token: string): Approval {
+  const data = unseal(token) as { mandate: unknown; approved_at: unknown };
   return { mandate: Mandate.parse(data.mandate), approved_at: String(data.approved_at) };
 }

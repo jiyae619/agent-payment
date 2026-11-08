@@ -7,6 +7,7 @@ import { useMemo, useState } from "react";
 import type { Mandate } from "@/lib/mandate.ts";
 import { LABEL_TEXT, readbackRows, type Label } from "@/lib/readback.ts";
 import { applyFix, findWarnings, type Warning } from "@/lib/warnings.ts";
+import Shopping from "./shopping";
 
 const STARTERS = [
   { label: "Buy running shoes", text: "Waterproof running shoes, size 8, under $120. Free returns please. Ask me if it's over $100." },
@@ -110,6 +111,7 @@ export default function Assistant() {
           }}
         />
       )}
+      {mandate && approval && <Shopping key={approval.token} approval={approval.token} />}
     </main>
   );
 }
