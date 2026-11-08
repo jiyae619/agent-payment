@@ -51,6 +51,10 @@ export function readbackRows(m: Mandate): Row[] {
     rows.push({ said: m.checkout.allowed_merchants[0].source_phrase, willDo: `Only from ${stores}`, label: "checked" });
   }
 
+  if ((m.checkout.avoid_merchants ?? []).length > 0) {
+    rows.push({ said: null, willDo: `Not from ${m.checkout.avoid_merchants!.map((s) => s.domain).join(" or ")}`, label: "checked" });
+  }
+
   for (const p of m.ext.must_haves) {
     rows.push({ said: p.source_phrase, willDo: `Must be ${describe(p.attr, p.value)}`, label: "checked" });
   }

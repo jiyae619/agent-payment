@@ -77,6 +77,14 @@ textarea.request { width: 100%; box-sizing: border-box; font: 17px/1.45 var(--fo
 .flag { display: flex; gap: 10px; align-items: flex-start; background: var(--ask-bg); border-radius: 10px; padding: 10px 12px; font-size: 15px; }
 .flag .link { margin-left: auto; flex: none; min-height: 0; padding: 0; }
 .flag.bad { background: var(--no-bg); }
+.past { display: grid; gap: 8px; border-top: 1px solid var(--line); padding-top: 12px; }
+.suggestion { display: flex; gap: 12px; align-items: flex-start; justify-content: space-between; border-radius: 10px; padding: 10px 12px; font-size: 15px; }
+.suggestion.tighten { background: var(--ask-bg); }
+.suggestion.loosen { background: var(--soft); }
+.suggestion-actions { display: flex; flex-direction: column; align-items: flex-end; flex: none; }
+.suggestion-actions .link { min-height: 0; padding: 2px 0; }
+.link.muted { color: var(--muted); }
+.link.small { font-size: 13px; min-height: 0; padding: 0; justify-self: start; }
 .alert { background: var(--no-bg); border-radius: 10px; padding: 10px 12px; font-size: 15px; }
 .assure { font-size: 14px; color: var(--muted); text-align: center; margin: -6px 0 0; }
 

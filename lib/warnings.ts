@@ -11,6 +11,8 @@ export type Fix =
   | { type: "set_hours"; hours: number }
   | { type: "set_budget"; value: number }
   | { type: "remove_store"; domain: string }
+  | { type: "avoid_store"; domain: string } // from a past-purchase suggestion: leave this store out
+  | { type: "add_store"; domain: string } // from a past-purchase suggestion: add to the named stores
   | { type: "any_store_ok" }
   | { type: "set_checkin_amount"; value: number };
 
@@ -140,6 +142,15 @@ export function applyFix(m: Mandate, fix: Fix): Mandate {
       break;
     case "remove_store":
       next.checkout.allowed_merchants = next.checkout.allowed_merchants.filter((s) => s.domain !== fix.domain);
+      break;
+    case "avoid_store":
+      next.checkout.avoid_merchants = [...(next.checkout.avoid_merchants ?? []).filter((s) => s.domain !== fix.domain), { domain: fix.domain, source_phrase: null }];
+      next.checkout.allowed_merchants = next.checkout.allowed_merchants.filter((s) => s.domain !== fix.domain);
+      break;
+    case "add_store":
+      if (!next.checkout.allowed_merchants.some((s) => s.domain === fix.domain)) {
+        next.checkout.allowed_merchants = [...next.checkout.allowed_merchants, { domain: fix.domain, source_phrase: null }];
+      }
       break;
     case "any_store_ok":
       next.ext.checkins = checkins.filter((c) => c.type !== "new_store");

@@ -46,6 +46,9 @@ export const Mandate = z.object({
   checkout: z.object({
     line_items: z.array(LineItem), // empty = ANY product → warning
     allowed_merchants: z.array(Merchant), // empty = ANY store → warning
+    // Stores the shopper chose to leave out, from a "From your past purchases" suggestion. Only the
+    // shopper adds these (one tap); the model never does. Absent = none.
+    avoid_merchants: z.array(Merchant).optional(),
   }),
 
   payment: z.object({

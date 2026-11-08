@@ -62,6 +62,11 @@ export function shortlist(m: Mandate, products: CatalogProduct[], size = 3): Sho
     left = left.filter((p) => stores.includes(domain(p.store)));
     funnel.push({ label: `at ${m.checkout.allowed_merchants.map((s) => s.domain).join(" or ")}`, count: left.length });
   }
+  const avoid = (m.checkout.avoid_merchants ?? []).map((s) => domain(s.domain));
+  if (avoid.length) {
+    left = left.filter((p) => !avoid.includes(domain(p.store)));
+    funnel.push({ label: `not from ${m.checkout.avoid_merchants!.map((s) => s.domain).join(" or ")}`, count: left.length });
+  }
 
   // Rank: most must-haves mentioned, then the named item before similar ones, then cheapest.
   const prefs = m.ext.must_haves;

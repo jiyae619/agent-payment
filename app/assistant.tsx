@@ -6,7 +6,9 @@
 import { useMemo, useState } from "react";
 import type { Mandate } from "@/lib/mandate.ts";
 import { readbackRows, type Label } from "@/lib/readback.ts";
-import { applyFix, findWarnings, type Warning } from "@/lib/warnings.ts";
+import { clearHistory, loadHistory } from "@/lib/history.ts";
+import { suggest, type Suggestion } from "@/lib/suggest.ts";
+import { applyFix, findWarnings, type Fix, type Warning } from "@/lib/warnings.ts";
 import AttackDemo from "./attack-demo";
 import Shopping from "./shopping";
 
@@ -96,6 +98,7 @@ export default function Assistant() {
           approved={approval !== null}
           onEdit={edit}
           onFix={(w) => w.fix && setMandate(applyFix(mandate, w.fix.action))}
+          onApply={(fix) => setMandate(applyFix(mandate, fix))}
           onKeep={(w) => setDismissed((d) => [...d, w.id + w.message])}
           onApproved={(token, approved) => {
             setMandate(approved);
@@ -112,6 +115,34 @@ export default function Assistant() {
   );
 }
 
+// "From your past purchases": one-tap suggestions from the shopper's history on this device.
+// Nothing changes unless they tap Apply; each one says which purchase it came from.
+function PastPurchases({ mandate, onApply }: { mandate: Mandate; onApply: (fix: Fix) => void }) {
+  const [history, setHistory] = useState(loadHistory);
+  const [hidden, setHidden] = useState<string[]>([]);
+  const list = useMemo(() => suggest(mandate, history).filter((s) => !hidden.includes(s.id)), [mandate, history, hidden]);
+  if (list.length === 0) return null;
+  const take = (s: Suggestion) => {
+    onApply(s.fix);
+    setHidden((h) => [...h, s.id]);
+  };
+  return (
+    <div className="past" aria-label="From your past purchases">
+      <p className="sub">From your past purchases</p>
+      {list.map((s) => (
+        <div key={s.id} className={`suggestion ${s.kind}`}>
+          <span>{s.message}<span className="note">From: {s.source}</span></span>
+          <span className="suggestion-actions">
+            <button type="button" className="link" onClick={() => take(s)}>Apply</button>
+            <button type="button" className="link muted" onClick={() => setHidden((h) => [...h, s.id])}>No thanks</button>
+          </span>
+        </div>
+      ))}
+      <button type="button" className="link muted small" onClick={() => { clearHistory(); setHistory([]); }}>Clear my history on this device</button>
+    </div>
+  );
+}
+
 function Readback(props: {
   mandate: Mandate;
   dismissed: string[];
@@ -119,6 +150,7 @@ function Readback(props: {
   onEdit: () => void;
   onFix: (w: Warning) => void;
   onKeep: (w: Warning) => void;
+  onApply: (fix: Fix) => void;
   onApproved: (token: string, mandate: Mandate) => void;
 }) {
   const { mandate, approved } = props;
@@ -174,6 +206,8 @@ function Readback(props: {
           </ul>
         </div>
       )}
+
+      {!approved && <PastPurchases mandate={mandate} onApply={props.onApply} />}
 
       {current && (
         <div className="flag" role="status">

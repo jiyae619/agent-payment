@@ -29,7 +29,7 @@ export type Context = {
 };
 
 export type VoidRule =
-  | "no_limit" | "over_limit" | "over_hold" | "bad_total" | "store_not_allowed" | "expired"
+  | "no_limit" | "over_limit" | "over_hold" | "bad_total" | "store_not_allowed" | "store_avoided" | "expired"
   | "over_quantity" | "blocked_category" | "not_exact_item" | "didnt_match" | "couldnt_check";
 export type CheckinRule = "over_amount" | "substitute" | "new_store" | "price_changed" | "final_sale" | "bought_recently";
 
@@ -65,6 +65,9 @@ export function decide(m: Mandate, p: Proposal, ctx: Context): Decision {
   const allowed = m.checkout.allowed_merchants.map((s) => domain(s.domain));
   if (allowed.length > 0 && !allowed.includes(domain(p.product.store))) {
     fail("store_not_allowed", `${p.product.store} isn't one of the stores you allowed.`);
+  }
+  if ((m.checkout.avoid_merchants ?? []).some((s) => domain(s.domain) === domain(p.product.store))) {
+    fail("store_avoided", `You chose to leave out ${p.product.store}.`);
   }
 
   const exp = new Date(m.exp.at).getTime();
