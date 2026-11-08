@@ -1,17 +1,18 @@
 "use client";
 
-// After approval: the assistant shops, and the shopper sees how it narrowed the choice, what it
-// picked and why, what the store's own words proved, and what happened to the money.
-// The "why" sentence is the only AI-written text; it's labelled as such.
+// Steps 2 and 3 of the Checkout Sheet: watch it shop (and stop it), see what it picked with the
+// store's own words, answer if it asks, and get the result. The "why" sentence is the only
+// AI-written text on these screens, and it is tagged as such.
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { CatalogProduct } from "@/lib/catalog.ts";
 import type { CheckResult, Decision } from "@/lib/enforce.ts";
 import type { Policy } from "@/lib/policy.ts";
 import type { FunnelStep } from "@/lib/shortlist.ts";
 
+type Step = { step: string; text: string; count?: number };
 type ShopResult = {
-  outcome?: "bought" | "released" | "ask" | "nothing_found";
+  outcome?: "bought" | "released" | "ask" | "nothing_found" | "stopped";
   message?: string;
   error?: string;
   funnel?: FunnelStep[];
@@ -24,9 +25,19 @@ type ShopResult = {
     readBack?: { order: string; authorization: string | null; capture: { id: string; status: string; amount: number } | null };
   };
   pending?: string;
-  proof?: { who_covers: string[]; events: { at: string; what: string }[]; paypal: { order_id: string } };
+  proof?: { events: { at: string; what: string }[]; paypal: { order_id: string } };
   proof_seal?: string;
 };
+
+const STAGES: Step[] = [
+  { step: "search", text: "Search stores" },
+  { step: "filter", text: "Keep what fits your limits" },
+  { step: "check", text: "Check the listings" },
+  { step: "pick", text: "Pick one" },
+  { step: "hold", text: "PayPal holds the money" },
+];
+
+const money = (n: number) => `$${Number.isInteger(n) ? n : n.toFixed(2)}`;
 
 // Save as proof: the sealed record as a file the shopper keeps.
 function saveProof(proof: unknown, seal: string, orderId: string) {
@@ -39,216 +50,272 @@ function saveProof(proof: unknown, seal: string, orderId: string) {
   URL.revokeObjectURL(url);
 }
 
-const money = (n: number) => `$${Number.isInteger(n) ? n : n.toFixed(2)}`;
-const VERDICT: Record<CheckResult["verdict"], { text: string; className: string }> = {
-  checked: { text: "✓ Checked", className: "text-emerald-700 dark:text-emerald-300" },
-  didnt_match: { text: "✗ Didn't match", className: "text-red-700 dark:text-red-300" },
-  couldnt_check: { text: "? Couldn't check", className: "text-amber-700 dark:text-amber-300" },
-};
-
-export default function Shopping({ approval }: { approval: string }) {
+export default function Shopping({ approval, onEdit }: { approval: string; onEdit: () => void }) {
+  const [steps, setSteps] = useState<Step[]>([]);
   const [result, setResult] = useState<ShopResult | null>(null);
-  const [busy, setBusy] = useState<"shop" | "pay" | "dont" | null>(null);
+  const [running, setRunning] = useState(false);
+  const [busy, setBusy] = useState<"pay" | "dont" | null>(null);
+  const controller = useRef<AbortController | null>(null);
+  const started = useRef(false);
 
-  async function post(url: string, body: unknown): Promise<ShopResult> {
-    const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-    const data = await res.json().catch(() => ({}));
-    return res.ok ? data : { ...data, error: data.error ?? "Something went wrong. Nothing was charged." };
+  async function run() {
+    const ctrl = new AbortController();
+    controller.current = ctrl;
+    setSteps([]);
+    setResult(null);
+    setRunning(true);
+    let held = false;
+    try {
+      const res = await fetch("/api/shop", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ approval }), signal: ctrl.signal });
+      if (!res.ok || !res.body) {
+        const data = await res.json().catch(() => ({}));
+        setResult({ error: data.error ?? "Something went wrong. Nothing was charged." });
+        return;
+      }
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        for (let i = buffer.indexOf("\n"); i >= 0; i = buffer.indexOf("\n")) {
+          const line = buffer.slice(0, i);
+          buffer = buffer.slice(i + 1);
+          if (!line) continue;
+          const event = JSON.parse(line);
+          if (event.type === "step") {
+            if (event.step === "hold") held = true;
+            setSteps((s) => [...s, event]);
+          } else if (event.type === "result") {
+            setResult(event);
+          }
+        }
+      }
+    } catch {
+      setResult(ctrl.signal.aborted && !held ? { outcome: "stopped" } : { error: "The connection dropped. Check your PayPal activity before trying again." });
+    } finally {
+      setRunning(false);
+    }
   }
 
-  async function shop() {
-    setBusy("shop");
-    setResult(await post("/api/shop", { approval }));
-    setBusy(null);
-  }
+  // Approving starts the shopping. The ref keeps React's development double-run from shopping twice.
+  useEffect(() => {
+    if (started.current) return;
+    started.current = true;
+    void run();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function answer(a: "pay" | "dont") {
     if (!result?.pending) return;
     setBusy(a);
-    const r = await post("/api/shop/answer", { pending: result.pending, answer: a });
+    const res = await fetch("/api/shop/answer", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pending: result.pending, answer: a }) });
+    const r = await res.json().catch(() => ({ error: "Something went wrong. Nothing changed." }));
     setResult({ ...result, ...r, pending: r.error ? result.pending : undefined, outcome: r.outcome ?? result.outcome });
     setBusy(null);
   }
 
-  if (!result) {
+  const held = steps.some((s) => s.step === "hold");
+
+  if (running || !result) {
+    const got = new Map(steps.map((s) => [s.step, s]));
+    const nowIndex = STAGES.findIndex((s) => !got.has(s.step));
     return (
-      <section className="mt-8">
-        <button
-          type="button"
-          onClick={shop}
-          disabled={busy !== null}
-          className="w-full rounded-xl bg-zinc-900 px-5 py-4 text-lg font-medium text-white disabled:opacity-50 sm:w-auto dark:bg-white dark:text-zinc-900"
-        >
-          {busy ? "Shopping… (searching stores and checking listings)" : "Start shopping"}
-        </button>
+      <section className="sheet" aria-live="polite" aria-labelledby="shop-title">
+        <span className="step" id="shop-title">Shopping…</span>
+        <ol className="progress">
+          {STAGES.map((s, i) => {
+            const ev = got.get(s.step);
+            return (
+              <li key={s.step} className={ev ? "done" : i === nowIndex ? "now" : ""}>
+                <span className="dot" aria-hidden />
+                {ev?.text ?? s.text}
+                {ev?.count !== undefined && <span className="n">{ev.count}</span>}
+              </li>
+            );
+          })}
+        </ol>
+        <p className="sub">{held ? "PayPal is holding the money. Not charged yet." : "Nothing is held yet."}</p>
+        {!held && (
+          <button type="button" className="btn secondary" onClick={() => controller.current?.abort()}>Stop</button>
+        )}
       </section>
     );
   }
 
-  const p = result.pick?.product;
+  if (result.outcome === "stopped") {
+    return (
+      <section className="sheet" aria-live="polite">
+        <span className="step">Stopped</span>
+        <p className="title">Nothing was held or bought.</p>
+        <div className="btns">
+          <button type="button" className="btn primary" onClick={() => void run()}>Start again</button>
+          <button type="button" className="btn secondary" onClick={onEdit}>Edit request</button>
+        </div>
+      </section>
+    );
+  }
+
+  if (result.error && !result.pick) {
+    return (
+      <section className="sheet" aria-live="polite">
+        <p role="alert" className="alert">{result.error}</p>
+        <button type="button" className="link" onClick={onEdit}>Edit request</button>
+      </section>
+    );
+  }
+
+  if (result.outcome === "nothing_found" || !result.pick) {
+    return (
+      <section className="sheet" aria-live="polite">
+        <span className="step">2 · Nothing found</span>
+        <p className="title">{result.message ?? "Nothing matched your limits."}</p>
+        <button type="button" className="link" onClick={onEdit}>Edit request</button>
+      </section>
+    );
+  }
+
   return (
-    <section className="mt-10 space-y-6" aria-live="polite">
-      <h2 className="text-2xl font-semibold">What it found</h2>
+    <>
+      <Picked result={result} busy={busy} onAnswer={answer} onEdit={onEdit} />
+      {result.outcome === "bought" && <Done result={result} />}
+    </>
+  );
+}
 
-      {result.funnel && (
-        <ol className="flex flex-wrap items-center gap-x-2 gap-y-1 text-zinc-700 dark:text-zinc-300">
-          {result.funnel.map((s, i) => (
-            <li key={i} className="flex items-center gap-2">
-              {i > 0 && <span aria-hidden>→</span>}
-              <span>
-                <span className="font-semibold">{s.count}</span> {s.label}
-              </span>
-            </li>
-          ))}
-        </ol>
-      )}
+function Picked({ result, busy, onAnswer, onEdit }: { result: ShopResult; busy: string | null; onAnswer: (a: "pay" | "dont") => void; onEdit: () => void }) {
+  const pick = result.pick!;
+  const p = pick.product;
+  const checks = result.checks ?? [];
+  const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+  const label = (c: CheckResult) => cap(c.value === "yes" ? c.attr : c.attr === "size" ? `size ${c.value}` : `${c.attr}: ${c.value}`);
+  // The store's words, once each. A very short quote ("8") gets its requirement's name so it reads on its own.
+  const quotes = [...new Set(checks.filter((c) => c.quote).map((c) => (c.quote!.length <= 3 ? `${cap(c.attr)} ${c.quote}` : c.quote!)))];
+  const asking = result.outcome === "ask" && result.decision?.action === "ask";
+  const released = result.outcome === "released";
+  const amount = pick.total ?? p.price;
 
-      {p && (
-        <div className="rounded-xl border border-zinc-200 p-4 dark:border-zinc-800">
-          <p className="text-lg font-semibold">{p.title}</p>
-          <p className="text-zinc-600 dark:text-zinc-400">
-            {money(p.price)} each at {p.store}
-          </p>
-          {result.pick?.total_line && (
-            <p className="mt-1 font-medium tabular-nums">Total for {result.pick.quantity}: {result.pick.total_line}</p>
+  return (
+    <section className="sheet" aria-live="polite" aria-labelledby="pick-title">
+      <span className="step" id="pick-title">2 · It picked</span>
+      <div className="product">
+        {p.image ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img className="photo" src={p.image} alt={p.title} />
+        ) : (
+          <div className="photo" aria-hidden />
+        )}
+        <div className="p-info">
+          <div className="p-title">{p.title}</div>
+          {p.url ? (
+            <a className="p-link" href={p.url} target="_blank" rel="noreferrer">{p.store} ↗</a>
+          ) : (
+            <span className="sub">{p.store}</span>
           )}
-          <p className="mt-3">
-            <span className="text-sm font-medium uppercase tracking-wide text-zinc-500">
-              Why this one{result.pick?.by === "ai" ? " (written by the AI)" : ""}:
-            </span>{" "}
-            {result.pick?.reason}
-          </p>
+          <div className="p-price">{pick.total_line ?? money(amount)}</div>
+        </div>
+      </div>
 
-          {result.checks && result.checks.length > 0 && (
-            <ul className="mt-4 space-y-2">
-              {result.checks.map((c, i) => (
-                <li key={i}>
-                  <span className={`font-medium ${VERDICT[c.verdict].className}`}>{VERDICT[c.verdict].text}</span>{" "}
-                  {c.value === "yes" ? c.attr : `${c.attr}: ${c.value}`}
-                  <span className="block text-sm text-zinc-500">
-                    {c.quote ? <>The store says: &ldquo;{c.quote}&rdquo;</> : "The listing doesn't say."}
+      {checks.length > 0 && (
+        <div className="facts">
+          <div className="fact-row">
+            <span className="fact-label">Matches</span>
+            <span className="chips">
+              {checks.map((c, i) => (
+                <span key={i} className={`chip ${c.verdict === "checked" ? "ok" : c.verdict === "didnt_match" ? "no" : "ask"}`}>
+                  <span className={`mark small ${c.verdict === "checked" ? "ok" : c.verdict === "didnt_match" ? "no" : "ask"}`} aria-hidden>
+                    {c.verdict === "checked" ? "✓" : c.verdict === "didnt_match" ? "✕" : "?"}
                   </span>
-                </li>
+                  {label(c)}
+                  {c.verdict !== "checked" && <span className="sr-only">{c.verdict === "didnt_match" ? " (doesn't match)" : " (couldn't check)"}</span>}
+                </span>
               ))}
-            </ul>
-          )}
-          {result.policy && (
-            <p className="mt-3 text-sm text-zinc-500">
-              Return policy read from{" "}
-              <a className="underline" href={result.policy.url} target="_blank" rel="noreferrer">
-                {p.store}
-              </a>{" "}
-              on {result.policy.retrieved}.
-            </p>
-          )}
+            </span>
+          </div>
+          <div className="fact-row">
+            <span className="fact-label">Listing says</span>
+            <span className="store-words">{quotes.length ? quotes.join(" · ") : "Nothing about these"}</span>
+          </div>
         </div>
       )}
 
-      <Outcome result={result} busy={busy} onAnswer={answer} />
-      {(result.outcome === "bought" || result.outcome === "released") && !result.error && <Receipt result={result} />}
+      <p className="why"><b>Why this one:</b> {pick.reason}{pick.by === "ai" && <span className="ai-tag">AI</span>}</p>
+
+      {asking && result.decision?.action === "ask" && (
+        <>
+          {result.decision.checkins.map((c, i) => (
+            <div key={i} className="flag"><span className="mark ask" aria-hidden>!</span><span>{c.message}</span></div>
+          ))}
+          <p className="sub">PayPal is holding {money(result.paypal?.held ?? amount)}. Not charged.</p>
+          <div className="btns">
+            <button type="button" className="btn primary" disabled={busy !== null} onClick={() => onAnswer("pay")}>{busy === "pay" ? "Paying…" : `Pay ${money(result.paypal?.held ?? amount)}`}</button>
+            <button type="button" className="btn secondary" disabled={busy !== null} onClick={() => onAnswer("dont")}>{busy === "dont" ? "Releasing…" : "Don't buy"}</button>
+          </div>
+        </>
+      )}
+
+      {released && (
+        <>
+          <div className="flag bad" role="status">
+            <span className="mark no" aria-hidden>✕</span>
+            <span>
+              Not bought. PayPal released the hold.
+              {result.decision?.action === "void" && (
+                <span className="note">{result.decision.reasons.map((r) => r.message).join(" ")}</span>
+              )}
+            </span>
+          </div>
+          <button type="button" className="link" onClick={onEdit}>Edit request</button>
+        </>
+      )}
+
+      {result.error && <p role="alert" className="alert">{result.error}</p>}
+
+      {result.funnel && (
+        <details className="more">
+          <summary>How it chose</summary>
+          <ol>{result.funnel.map((s, i) => <li key={i}>{s.count} {s.label}</li>)}</ol>
+        </details>
+      )}
     </section>
   );
 }
 
-function Receipt({ result }: { result: ShopResult }) {
+function Done({ result }: { result: ShopResult }) {
   const pp = result.paypal;
   const rb = pp?.readBack;
+  const asked = result.decision?.action === "ask";
   return (
-    <div className="space-y-4 rounded-xl border border-zinc-200 p-4 dark:border-zinc-800">
-      <h3 className="text-lg font-semibold">Receipt</h3>
-      {result.proof && (
-        <div>
-          <p className="text-sm font-medium uppercase tracking-wide text-zinc-500">Who covers this?</p>
-          <ul className="mt-1 list-disc space-y-1 pl-5">
-            {result.proof.who_covers.map((line, i) => <li key={i}>{line}</li>)}
-          </ul>
-        </div>
-      )}
+    <section className="sheet" aria-labelledby="done-title">
+      <span className="step" id="done-title">3 · Done</span>
+      <div>
+        <div className="money">{money(pp?.amount ?? 0)}</div>
+        <p className="sub">Charged · {result.pick?.product.title}</p>
+      </div>
+      <ul className="list">
+        <li className="li"><span className="mark ok" aria-hidden>✓</span><span className="what">{asked ? "You said yes when it asked" : "Within your limit"}</span></li>
+        {(result.checks ?? []).filter((c) => c.verdict === "checked").length > 0 && (
+          <li className="li"><span className="mark ok" aria-hidden>✓</span><span className="what">Every check passed</span></li>
+        )}
+      </ul>
+      <p className="sub">Problem later? Not received or not as described: PayPal Purchase Protection. Not what you wanted: the store&apos;s returns.</p>
       {result.proof && result.proof_seal && (
-        <div>
-          <button
-            type="button"
-            onClick={() => saveProof(result.proof, result.proof_seal!, result.proof!.paypal.order_id)}
-            className="rounded-lg border border-zinc-400 px-4 py-2 font-medium hover:bg-zinc-100 dark:border-zinc-600 dark:hover:bg-zinc-800"
-          >
-            Save as proof
-          </button>
-          <p className="mt-1 text-sm text-zinc-500">
-            A sealed file with your words, what you approved, every check with the store&apos;s words, the return policy as it was today, and the PayPal IDs.
-          </p>
-        </div>
+        <button type="button" className="btn secondary" onClick={() => saveProof(result.proof, result.proof_seal!, result.proof!.paypal.order_id)}>
+          Save as proof
+        </button>
       )}
-      <details>
-        <summary className="cursor-pointer font-medium">Details</summary>
-        <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
-          <dt className="text-zinc-500">PayPal order</dt><dd className="font-mono">{pp?.orderId}</dd>
-          <dt className="text-zinc-500">Hold</dt><dd className="font-mono">{pp?.authorizationId}</dd>
-          {pp?.captureId && (<><dt className="text-zinc-500">Charge</dt><dd className="font-mono">{pp.captureId}</dd></>)}
-          {rb && (<><dt className="text-zinc-500">PayPal says now</dt><dd>order {rb.order.toLowerCase()}, hold {rb.authorization?.toLowerCase() ?? "none"}{rb.capture ? `, charge ${rb.capture.status.toLowerCase()} for ${money(rb.capture.amount)}` : ""}</dd></>)}
+      <details className="more">
+        <summary>Details</summary>
+        <dl>
+          <dt>PayPal order</dt><dd>{pp?.orderId}</dd>
+          {pp?.captureId && (<><dt>Charge</dt><dd>{pp.captureId}</dd></>)}
+          {rb && (<><dt>PayPal says</dt><dd>{rb.order.toLowerCase()}{rb.capture ? `, ${money(rb.capture.amount)} ${rb.capture.status.toLowerCase()}` : ""}</dd></>)}
         </dl>
         {result.proof && (
-          <ol className="mt-3 space-y-1 text-sm">
-            {result.proof.events.map((e, i) => (
-              <li key={i}><span className="font-mono text-zinc-500">{new Date(e.at).toLocaleTimeString()}</span> {e.what}</li>
-            ))}
-          </ol>
+          <ol>{result.proof.events.map((e, i) => <li key={i}>{new Date(e.at).toLocaleTimeString()} · {e.what}</li>)}</ol>
         )}
       </details>
-    </div>
+    </section>
   );
-}
-
-function Outcome({ result, busy, onAnswer }: { result: ShopResult; busy: string | null; onAnswer: (a: "pay" | "dont") => void }) {
-  const box = "rounded-xl border-2 p-4";
-  if (result.error) {
-    return <p role="alert" className={`${box} border-red-400 bg-red-50 dark:bg-red-950`}>{result.error}</p>;
-  }
-  if (result.outcome === "nothing_found") {
-    return <p className={`${box} border-zinc-300`}>{result.message}</p>;
-  }
-  if (result.outcome === "bought") {
-    return (
-      <div role="status" className={`${box} border-emerald-500 bg-emerald-50 dark:bg-emerald-950`}>
-        <p className="text-lg font-semibold">✓ Bought for {money(result.paypal?.amount ?? 0)}</p>
-        <p className="mt-1">
-          {result.decision?.action === "ask" ? "You said yes, so PayPal took the held money." : "Everything checked out, so PayPal took the held money."} PayPal capture:{" "}
-          {result.paypal?.captureId}
-        </p>
-      </div>
-    );
-  }
-  if (result.outcome === "released") {
-    const reasons = result.decision?.action === "void" ? result.decision.reasons : [];
-    return (
-      <div role="status" className={`${box} border-amber-500 bg-amber-50 dark:bg-amber-950`}>
-        <p className="text-lg font-semibold">Nothing was charged. PayPal released the hold.</p>
-        {reasons.length > 0 && (
-          <ul className="mt-2 list-disc pl-5">
-            {reasons.map((r, i) => <li key={i}>{r.message}</li>)}
-          </ul>
-        )}
-        {reasons.length === 0 && <p className="mt-1">You chose not to buy it.</p>}
-      </div>
-    );
-  }
-  if (result.outcome === "ask" && result.decision?.action === "ask") {
-    return (
-      <div className={`${box} border-sky-500 bg-sky-50 dark:bg-sky-950`}>
-        <p className="text-lg font-semibold">✋ It asks you first</p>
-        <ul className="mt-2 list-disc pl-5">
-          {result.decision.checkins.map((c, i) => <li key={i}>{c.message}</li>)}
-        </ul>
-        <p className="mt-2">PayPal is holding {money(result.paypal?.held ?? 0)}. Nothing is charged unless you say so.</p>
-        <div className="mt-3 flex flex-wrap gap-2">
-          <button type="button" disabled={busy !== null} onClick={() => onAnswer("pay")} className="rounded-lg bg-[#0070ba] px-4 py-2 font-medium text-white disabled:opacity-50">
-            {busy === "pay" ? "Paying…" : `Pay ${money(result.paypal?.held ?? 0)}`}
-          </button>
-          <button type="button" disabled={busy !== null} onClick={() => onAnswer("dont")} className="rounded-lg border border-sky-600 px-4 py-2 disabled:opacity-50">
-            {busy === "dont" ? "Releasing…" : "Don't buy"}
-          </button>
-        </div>
-      </div>
-    );
-  }
-  return null;
 }

@@ -50,7 +50,7 @@ export const Mandate = z.object({
 
   payment: z.object({
     amount_range: z.object({
-      max: z.number().positive().nullable(), // total incl. shipping & tax; null = shopper gave no amount → warning
+      max: z.number().positive().nullable(), // the most PayPal may take; the demo holds the listed item price (shipping isn't known); null = no amount → warning
       currency: z.literal("USD"),
       source_phrase: SourcePhrase,
     }),

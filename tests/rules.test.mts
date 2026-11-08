@@ -129,10 +129,13 @@ test("the model can never set the payment account; the app owns it", () => {
 
 test("readback: every limit shows the shopper's own words, and the price limit is the PayPal-locked one", () => {
   const rows = readbackRows(normalizeDraft(shoesDraft(), shoesText, NOW));
-  const price = rows.find((r) => r.willDo.startsWith("Spend no more than $120"));
+  const price = rows.find((r) => r.willDo.startsWith("Up to $120"));
   assert.equal(price?.label, "locked");
   assert.equal(price?.said, "under 120");
-  assert.ok(rows.some((r) => r.willDo === "Ask you before paying more than $100" && r.label === "asks"));
-  assert.ok(rows.some((r) => r.willDo === "Only buy if the store offers free returns" && r.label === "checked"));
+  // The screen must not claim shipping is inside the limit: the demo only knows the item price.
+  assert.match(price?.willDo ?? "", /shipping not checked/);
+  assert.ok(rows.some((r) => r.willDo === "Asks you above $100" && r.label === "asks"));
+  assert.ok(rows.some((r) => r.willDo === "Store must offer free returns" && r.label === "checked"));
+  assert.ok(rows.some((r) => r.label === "never" && /gift cards/.test(r.willDo)), "the gift-card ban is always shown");
   assert.equal(rows.filter((r) => r.label === "locked").length, 1, "only the price is locked by PayPal; nothing else may claim that");
 });

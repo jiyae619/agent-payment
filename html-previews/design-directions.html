@@ -1,0 +1,248 @@
+<title>Shopping Assistant Directions</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* Layout: two directions, each a strip of three checkout-sized screens (Asked → Picked → Done).
+   Tokens: one neutral ink, one action blue, three verdict colors; nothing decorative. */
+/* Palette follows PayPal's public guidance for partner UIs: neutral black and white with blue only as an
+   accent (links, focus), black or blue actions on light backgrounds (WCAG AA), no PayPal logo or typeface. */
+:root {
+  --bg: #f2f3f5; --sheet: #ffffff; --ink: #0b0c0e; --muted: #5a606b; --line: #e4e6ea; --soft: #f5f6f8;
+  --action: #0b0c0e; --action-ink: #ffffff; --accent: #0070ba;
+  --ok: #157347; --ask: #a15c00; --no: #b42318;
+  --ok-bg: #e6f4ec; --ask-bg: #fdf1df; --no-bg: #fbe8e6;
+  --sans: "Atkinson Hyperlegible", system-ui, sans-serif; --mono: "IBM Plex Mono", ui-monospace, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #111214; --sheet: #1a1b1e; --ink: #f1f2f4; --muted: #a0a6b0; --line: #2c2e33; --soft: #222428;
+  --action: #ffffff; --action-ink: #0b0c0e; --accent: #6cb4ea; --ok: #5ccf94; --ask: #f0a94a; --no: #f2867c;
+  --ok-bg: #16301f; --ask-bg: #33260f; --no-bg: #36191a; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #111214; --sheet: #1a1b1e; --ink: #f1f2f4; --muted: #a0a6b0; --line: #2c2e33; --soft: #222428;
+  --action: #ffffff; --action-ink: #0b0c0e; --accent: #6cb4ea; --ok: #5ccf94; --ask: #f0a94a; --no: #f2867c;
+  --ok-bg: #16301f; --ask-bg: #33260f; --no-bg: #36191a; color-scheme: dark }
+body { background: var(--bg); color: var(--ink); font: 17px/1.45 var(--sans); -webkit-font-smoothing: antialiased; }
+.wrap { max-width: 1080px; margin: 0 auto; padding-block: 36px 72px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 44px; }
+h1 { font-size: clamp(24px, 3.6vw, 32px); margin: 0; text-wrap: balance; }
+.intro { color: var(--muted); margin: 6px 0 0; max-width: 62ch; }
+.dir-head h2 { font-size: 21px; margin: 0; }
+.dir-head p { margin: 4px 0 0; color: var(--muted); font-size: 15px; max-width: 70ch; }
+.strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; margin-top: 14px; }
+.strip > * { min-width: 0; }
+.sheet { background: var(--sheet); border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 14px;
+  box-shadow: 0 1px 2px rgba(16,24,40,.06), 0 10px 28px -16px rgba(16,24,40,.30); }
+.step { font: 500 12px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.title { font-size: 21px; font-weight: 700; margin: -6px 0 0; text-wrap: balance; }
+.quote { background: var(--soft); border-radius: 10px; padding: 10px 12px; font-size: 16px; }
+.btn { min-height: 48px; border-radius: 12px; border: 0; font: 700 16px var(--sans); padding: 0 16px; cursor: pointer; }
+.btn.primary { background: var(--action); color: var(--action-ink); }
+.btn.secondary { background: transparent; color: var(--ink); box-shadow: inset 0 0 0 1.5px var(--line); }
+.btns { display: flex; gap: 10px; } .btns .btn { flex: 1; }
+.btn:focus-visible { outline: 3px solid var(--action); outline-offset: 2px; }
+.money { font: 500 30px var(--mono); font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+.sub { color: var(--muted); font-size: 15px; }
+
+/* Verdict marks: color + shape, so they read without color too */
+.mark { width: 22px; height: 22px; flex: none; display: inline-grid; place-items: center; font: 700 13px var(--sans); color: var(--sheet); }
+.mark.ok { background: var(--ok); border-radius: 50%; }
+.mark.ask { background: var(--ask); clip-path: polygon(50% 4%, 100% 96%, 0 96%); padding-top: 5px; }
+.mark.no { background: var(--no); border-radius: 4px; }
+.mark.lock { background: var(--ink); border-radius: 6px; }
+
+/* ---------- A. Checkout Sheet: one list per step ---------- */
+.list { display: grid; gap: 0; }
+.li { display: flex; gap: 12px; align-items: flex-start; padding: 9px 0; border-top: 1px solid var(--line); }
+.li:first-child { border-top: 0; }
+.li .what { flex: 1; min-width: 0; }
+.li .proof { display: block; font-size: 14px; color: var(--muted); }
+.flag { display: flex; gap: 10px; align-items: flex-start; background: var(--ask-bg); border-radius: 10px; padding: 10px 12px; font-size: 15px; }
+.flag button { margin-left: auto; flex: none; background: none; border: 0; color: var(--accent); font: 700 15px var(--sans); padding: 0; cursor: pointer; }
+.held { display: flex; justify-content: space-between; align-items: baseline; border-top: 1px dashed var(--line); padding-top: 12px; }
+
+/* Editable request */
+.ask-box { display: grid; gap: 8px; }
+.ask-box form { display: grid; gap: 8px; }
+.ask-box textarea { width: 100%; box-sizing: border-box; font: 16px/1.45 var(--sans); color: var(--ink); background: var(--soft); border: 1.5px solid var(--action); border-radius: 10px; padding: 10px 12px; resize: vertical; }
+.ends { margin: -8px 0 0; text-align: center; font-size: 14px; color: var(--muted); }
+.link.inline { min-height: 0; padding: 0; font-size: 14px; display: inline; }
+.progress { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.progress li { display: flex; align-items: center; gap: 10px; color: var(--muted); }
+.progress li.done, .progress li.now { color: var(--ink); }
+.progress .dot { width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--line); flex: none; }
+.progress li.done .dot { background: var(--ok); border-color: var(--ok); }
+.progress li.now .dot { border-color: var(--ink); animation: pulse 1.2s ease-in-out infinite; }
+.progress .n { margin-left: auto; font: 500 13px var(--mono); color: var(--muted); }
+@keyframes pulse { 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { .progress li.now .dot { animation: none; } }
+.sdk-slot { min-height: 48px; border-radius: 999px; border: 1.5px dashed var(--muted); display: grid; place-items: center; text-align: center; padding: 6px 14px; font: 500 12px var(--mono); letter-spacing: .04em; color: var(--muted); }
+.assure { font-size: 14px; color: var(--muted); margin-top: -6px; text-align: center; }
+.link { justify-self: start; align-self: flex-start; background: none; border: 0; padding: 6px 0; min-height: 40px; color: var(--accent); font: 700 15px var(--sans); cursor: pointer; }
+.link:focus-visible { outline: 3px solid var(--action); outline-offset: 2px; border-radius: 4px; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+
+/* Product card */
+:root { --photo-bg: #eef2f6; --photo-shoe: #33506b; --photo-sole: #c9d3dd; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --photo-bg: #26303a; --photo-shoe: #8fb0cf; --photo-sole: #4a5866; } }
+:root[data-theme="dark"] { --photo-bg: #26303a; --photo-shoe: #8fb0cf; --photo-sole: #4a5866; }
+.product { display: grid; grid-template-columns: 96px 1fr; gap: 14px; align-items: center; }
+.photo { width: 96px; aspect-ratio: 1; max-width: 100%; border-radius: 12px; background: var(--photo-bg); display: grid; place-items: center; box-shadow: inset 0 0 0 1px rgba(0,0,0,.05); }
+.photo svg { width: 78%; }
+.p-info { min-width: 0; display: grid; gap: 2px; }
+.p-title { font-weight: 700; font-size: 17px; line-height: 1.25; }
+.p-link { color: var(--accent); font-size: 14px; text-decoration: none; }
+.p-link:hover { text-decoration: underline; }
+.p-price { font: 500 22px var(--mono); font-variant-numeric: tabular-nums; margin-top: 2px; }
+.facts { display: grid; gap: 8px; border-top: 1px solid var(--line); padding-top: 12px; }
+.fact-row { display: grid; grid-template-columns: 92px 1fr; gap: 10px; align-items: start; font-size: 15px; }
+.fact-label { color: var(--muted); font-size: 14px; padding-top: 3px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; background: var(--ok-bg); border-radius: 999px; padding: 3px 10px 3px 4px; font-size: 14px; }
+.chip .mark { width: 18px; height: 18px; font-size: 11px; }
+.said-by-store { font: 500 14px var(--mono); color: var(--ink); padding-top: 3px; }
+
+/* ---------- B. Trace: each requirement followed across the three steps ---------- */
+.trace { overflow-x: auto; }
+.trace table { width: 100%; border-collapse: collapse; min-width: 640px; font-size: 16px; }
+.trace th { text-align: left; font: 500 12px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); padding: 0 12px 10px 0; }
+.trace td { padding: 12px 12px 12px 0; border-top: 1px solid var(--line); vertical-align: top; }
+.trace td.said { color: var(--muted); }
+.trace .cell { display: flex; gap: 10px; align-items: flex-start; }
+.trace .proof { display: block; font-size: 14px; color: var(--muted); }
+.trace tfoot td { border-top: 2px solid var(--ink); font-weight: 700; }
+.bar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; margin-top: 16px; }
+.bar .money { font-size: 26px; }
+</style>
+
+<main class="wrap">
+  <header>
+    <h1>Shopping Assistant: two simpler directions</h1>
+    <p class="intro">Three questions, nothing else: what you asked, what the assistant will do or picked, and what happened. Same request in both. Colors follow PayPal's public guidance for partner screens: black and white, blue only as an accent, and PayPal's own SDK button where PayPal is involved.</p>
+  </header>
+
+  <!-- A -->
+  <section>
+    <div class="dir-head">
+      <h2>A. Checkout Sheet</h2>
+      <p>Three short screens, each the size of a payment sheet. One list per screen; every line is a rule, a mark, and the proof if there is one.</p>
+    </div>
+    <div class="strip">
+      <article class="sheet" aria-label="Step 1">
+        <span class="step">1 · You asked</span>
+        <div class="ask-box">
+          <div class="quote" id="req-view">"Waterproof running shoes, size 8, under $120. Ask me if it's over $100."</div>
+          <form id="req-edit" hidden>
+            <label class="sr" for="req-text">Your request</label>
+            <textarea id="req-text" rows="3">Waterproof running shoes, size 8, under $120. Ask me if it's over $100.</textarea>
+            <div class="btns"><button class="btn primary" type="submit">Update</button><button class="btn secondary" type="button" id="req-cancel">Cancel</button></div>
+          </form>
+          <button class="link" type="button" id="req-change">Edit request</button>
+        </div>
+        <div class="list">
+          <div class="li"><span class="mark lock">$</span><span class="what">Up to $120 for the item<span class="proof">Shipping isn't checked</span></span></div>
+          <div class="li"><span class="mark ok">✓</span><span class="what">Running shoes · waterproof · size 8</span></div>
+          <div class="li"><span class="mark ask">!</span><span class="what">Asks you above $100</span></div>
+          <div class="li"><span class="mark no">✕</span><span class="what">Never gift cards or money</span></div>
+        </div>
+        <div class="flag"><span class="mark ask">!</span><span>No store named</span><button type="button">Any store OK</button></div>
+        <div class="sdk-slot">PayPal's own button, rendered by the PayPal JS SDK (blue)</div>
+        <p class="assure">Nothing is charged without your OK.</p>
+        <p class="ends">Ends Mon 6:30 PM · <button class="link inline" type="button">Cancel anytime</button></p>
+      </article>
+
+      <article class="sheet" aria-label="Shopping">
+        <span class="step">Shopping…</span>
+        <ol class="progress">
+          <li class="done"><span class="dot"></span>Searched stores<span class="n">9 found</span></li>
+          <li class="done"><span class="dot"></span>Removed gift cards and over $120<span class="n">6 left</span></li>
+          <li class="now"><span class="dot"></span>Checking 3 listings</li>
+          <li><span class="dot"></span>Pick one</li>
+        </ol>
+        <p class="sub">Nothing is held yet.</p>
+        <button class="btn secondary" type="button">Stop</button>
+      </article>
+
+      <article class="sheet" aria-label="Step 2">
+        <span class="step">2 · It picked</span>
+        <div class="product">
+          <div class="photo" role="img" aria-label="Product photo">
+            <svg viewBox="0 0 120 80" aria-hidden="true"><path d="M8 58c0-6 4-9 10-10l22-4c6-1 10-6 14-12l6-9c2-3 6-4 9-2l6 4c3 2 3 6 1 9l-3 4c6 2 13 3 21 4 9 1 16 6 18 14v4H8z" fill="var(--photo-shoe)"/><path d="M8 62h110v6c0 2-2 4-4 4H12c-2 0-4-2-4-4z" fill="var(--photo-sole)"/></svg>
+          </div>
+          <div class="p-info">
+            <div class="p-title">Momentum Waterproof Trail Shoes</div>
+            <a class="p-link" href="#" onclick="return false">mountainwarehouse.com ↗</a>
+            <div class="p-price">$108</div>
+          </div>
+        </div>
+        <div class="facts">
+          <div class="fact-row"><span class="fact-label">Matches</span><span class="chips"><span class="chip"><span class="mark ok">✓</span>Waterproof</span><span class="chip"><span class="mark ok">✓</span>Size 8</span><span class="chip"><span class="mark ok">✓</span>Under $120</span></span></div>
+          <div class="fact-row"><span class="fact-label">Listing says</span><span class="said-by-store">Waterproof · Sizes 7–14</span></div>
+        </div>
+        <div class="flag"><span class="mark ask">!</span><span>Over $100. Buy it?</span></div>
+        <div class="held"><span class="sub">PayPal is holding $108. Not charged.</span></div>
+        <div class="btns"><button class="btn primary" type="button">Pay $108</button><button class="btn secondary" type="button">Don't buy</button></div>
+        <button class="link" type="button">Change request</button>
+      </article>
+
+      <article class="sheet" aria-label="Step 3">
+        <span class="step">3 · Done</span>
+        <div>
+          <div class="money">$108.00</div>
+          <div class="sub">Charged · Momentum Waterproof Trail Shoes</div>
+        </div>
+        <div class="list">
+          <div class="li"><span class="mark ok">✓</span><span class="what">Within $120</span></div>
+          <div class="li"><span class="mark ok">✓</span><span class="what">Waterproof · size 8</span></div>
+          <div class="li"><span class="mark ok">✓</span><span class="what">You approved $108</span></div>
+        </div>
+        <div class="sub">Problem later? Not received or not as described: PayPal Purchase Protection. Not what you wanted: the store's returns.</div>
+        <button class="btn secondary" type="button">Save as proof</button>
+      </article>
+    </div>
+  </section>
+
+  <!-- B -->
+  <section>
+    <div class="dir-head">
+      <h2>B. Trace</h2>
+      <p>One table that follows each thing you asked for across the whole purchase: your words, the rule, what the store's listing says. The same table is the readback before, and the receipt after.</p>
+    </div>
+    <div class="strip" style="grid-template-columns: 1fr;">
+      <article class="sheet" aria-label="Trace, before paying">
+        <span class="step">Before you pay · held $108, not charged</span>
+        <div class="product">
+          <div class="photo" role="img" aria-label="Product photo">
+            <svg viewBox="0 0 120 80" aria-hidden="true"><path d="M8 58c0-6 4-9 10-10l22-4c6-1 10-6 14-12l6-9c2-3 6-4 9-2l6 4c3 2 3 6 1 9l-3 4c6 2 13 3 21 4 9 1 16 6 18 14v4H8z" fill="var(--photo-shoe)"/><path d="M8 62h110v6c0 2-2 4-4 4H12c-2 0-4-2-4-4z" fill="var(--photo-sole)"/></svg>
+          </div>
+          <div class="p-info">
+            <div class="p-title">Momentum Waterproof Trail Shoes</div>
+            <a class="p-link" href="#" onclick="return false">mountainwarehouse.com ↗</a>
+          </div>
+        </div>
+        <div class="trace">
+          <table>
+            <thead><tr><th>You said</th><th>Rule</th><th>Momentum Waterproof Trail Shoes</th></tr></thead>
+            <tbody>
+              <tr><td class="said">"under $120"</td><td>Up to $120</td><td><span class="cell"><span class="mark ok">✓</span>$108</span></td></tr>
+              <tr><td class="said">"waterproof"</td><td>Waterproof</td><td><span class="cell"><span class="mark ok">✓</span><span>Checked<span class="proof">"Waterproof"</span></span></span></td></tr>
+              <tr><td class="said">"size 8"</td><td>Size 8</td><td><span class="cell"><span class="mark ok">✓</span><span>Checked<span class="proof">"Sizes: 7, 8, 9…"</span></span></span></td></tr>
+              <tr><td class="said">"ask me if it's over $100"</td><td>Ask above $100</td><td><span class="cell"><span class="mark ask">!</span>Asking you now</span></td></tr>
+              <tr><td class="said">(added)</td><td>No gift cards or money</td><td><span class="cell"><span class="mark ok">✓</span>Shoes</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="bar">
+          <span><span class="money">$108</span> <span class="sub">at mountainwarehouse.com</span></span>
+          <span class="btns" style="min-width:min(100%,320px)"><button class="btn primary" type="button">Pay $108</button><button class="btn secondary" type="button">Don't buy</button></span>
+        </div>
+      </article>
+    </div>
+  </section>
+</main>
+
+<script>
+// Mock only: shows how "Edit request" swaps the quote for an editable box.
+const view = document.getElementById("req-view"), form = document.getElementById("req-edit"), change = document.getElementById("req-change"), text = document.getElementById("req-text");
+change.addEventListener("click", () => { view.hidden = true; change.hidden = true; form.hidden = false; text.focus(); });
+document.getElementById("req-cancel").addEventListener("click", () => { form.hidden = true; view.hidden = false; change.hidden = false; });
+form.addEventListener("submit", (e) => { e.preventDefault(); view.textContent = "“" + text.value.trim() + "”"; form.hidden = true; view.hidden = false; change.hidden = false; });
+</script>

@@ -15,7 +15,7 @@ export type CheckResult = { attr: string; value: string; verdict: Verdict; quote
 export type Proposal = {
   product: CatalogProduct;
   quantity: number;
-  total: number; // USD, incl. shipping & tax: what would be captured
+  total: number; // USD, what would be captured: listed price × quantity (shipping isn't known in the demo)
   checks: CheckResult[]; // from the product checker; a must-have with no result counts as "couldn't check"
   is_substitute: boolean; // true when this is not the item the shopper named (set by the pick step)
   final_sale?: boolean; // the listing says final sale / non-returnable; unset = the listing doesn't say

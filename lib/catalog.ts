@@ -12,6 +12,7 @@ export type CatalogProduct = {
   attributes: Record<string, string>; // Channel3 structured_attributes
   sizes: string[]; // from variant options named "Size", when present
   image: string | null;
+  url?: string | null; // the store's own listing page, from the chosen offer (absent in older snapshots)
   price: number; // USD, from the chosen offer
   store: string; // retailer domain from the offer, e.g. "rei.com"
   condition: string | null; // new / used / refurbished
@@ -89,6 +90,7 @@ export function toCatalogProduct(p: Channel3Product): CatalogProduct | null {
     attributes,
     sizes,
     image: image?.cleaned_url ?? image?.url ?? null,
+    url: offer.url ?? null,
     price: offer.price.price,
     store: offer.domain,
     condition: offer.condition ?? null,
