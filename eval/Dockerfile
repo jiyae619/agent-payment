@@ -6,6 +6,7 @@ RUN npm install --omit=dev --no-audit --no-fund
 COPY lib ./lib
 COPY scripts ./scripts
 COPY data/fixtures ./data/fixtures
+COPY data/policies.json ./data/policies.json
 COPY eval ./eval
 # Run the eval once, then stay idle so a container restart can't re-run it and spend credits.
-CMD ["sh", "-c", "node scripts/eval.mts; echo 'Eval finished. Press Ctrl+C to stop.'; sleep infinity"]
+CMD ["sh", "-c", "node scripts/eval-entry.mts; echo 'Eval finished. Press Ctrl+C to stop.'; sleep infinity"]

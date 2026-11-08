@@ -207,3 +207,22 @@ Haiku 5.5's extra misses are over-caution: it said "couldn't check" when the tit
 **Decision: Claude Sonnet 5, high effort, for the product checker.** Zero critical mistakes, the most requirements proven, about $0.01 per purchase (3 checks). Haiku 5.5 is the fallback if cost ever matters: also zero critical, about 18× cheaper.
 
 Cost of this round: about $1.20 on the Anthropic key. **Caution:** the two prompt rules were found on the same 37 cases they were re-scored on, so these scores are optimistic.
+
+---
+
+## Round 8 — Product checker on the Astropods gateway: non-Claude models (Nov 7)
+
+Same 37 cases × 3 runs, same system prompt, message and plain-code quote guard (moved to `lib/check-core.ts` so the container, which has no Anthropic SDK, runs the app's exact guard). Run with `ast project start` (`eval/config.json` `"task": "checker"`). Each model is probed with one case first and skipped if the gateway doesn't serve it. Real cost from `ast billing models`: **$0.57** for this round (credit left: **$5.89**).
+
+| Model (via gateway) | pass^3 | Cases with a critical mistake | Avg time | Cost this round |
+|---|---|---|---|---|
+| **GPT-5.6 Luna** | **34/37** | **0** | **0.6 s** | $0.03 |
+| Claude Sonnet 5 (gateway, no effort setting) | 32/37 | 0 | 1.5 s | $0.47 |
+| Mistral Large 3 | 25/37 | **4** | 0.9 s | $0.06 |
+| Claude Haiku 5.5 | not run: the gateway couldn't route it ("could not auto resolve a provider") | | | |
+
+- **Luna:** its only misses are the two quantity cases (never sent to the checker by the app) and the "Waterproof" attribute quote flagged for a hand check (valid). On the cases the app actually sends, it made no mistakes.
+- **Sonnet 5 through the gateway scored lower than direct** (32 vs 34): no effort setting and JSON-by-instruction instead of Anthropic's structured output. It took "Citrus Grove" as a scent in 3 of 3 runs. Round 7 (direct, high effort, structured output) is the setup the app uses.
+- **Mistral Large 3:** 2 real critical mistakes ("New Colorway" taken as condition new) plus 3 replies that broke the answer format (counted critical by the runner; in the app a broken reply stops the purchase with "couldn't check the products right now", no money moves). Dropped, as in the drafter eval.
+
+**Not decided by this round:** Luna matches or beats Sonnet 5 for checking, at about a tenth of the cost and less than half the time. Using it in the public app needs an OpenAI (or OpenRouter) key, since the gateway key only exists inside Astropods containers. Sonnet 5 stays the app's checker until the owner decides.
