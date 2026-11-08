@@ -82,6 +82,13 @@ test("the funnel counts each step, so the shopper sees why products were dropped
   ]);
 });
 
+test("the limit covers every item: 3 at $20 is over a $50 limit, so it never reaches the hold", () => {
+  // Without this, PayPal would hold $60 on a $50 approval before enforcement released it.
+  const m = mandate((m) => { m.checkout.line_items[0].quantity = 3; m.payment.amount_range.max = 50; m.checkout.allowed_merchants = []; m.ext.must_haves = []; });
+  const ids = shortlist(m, [shoe({ id: "twenty", price: 20 }), shoe({ id: "fifteen", price: 15 })]).candidates.map((p) => p.id);
+  assert.deepEqual(ids, ["fifteen"]);
+});
+
 test("a size is matched as a whole word: 18 is not size 8", () => {
   assert.equal(mentions(shoe({ sizes: ["18"] }), "8", "size"), false);
   assert.equal(mentions(shoe({ sizes: ["US 8"] }), "8", "size"), true);

@@ -51,7 +51,9 @@ export function shortlist(m: Mandate, products: CatalogProduct[], size = 3): Sho
 
   const max = m.payment.amount_range.max;
   if (max !== null) {
-    left = left.filter((p) => p.price <= max);
+    // The limit covers the whole purchase: 3 bottles at $20 is $60, over a $50 limit.
+    const qty = m.checkout.line_items[0]?.quantity ?? 1;
+    left = left.filter((p) => Math.round(p.price * qty * 100) <= Math.round(max * 100));
     funnel.push({ label: `under ${money(max)}`, count: left.length });
   }
 
