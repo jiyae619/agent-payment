@@ -15,7 +15,7 @@ type ShopResult = {
   message?: string;
   error?: string;
   funnel?: FunnelStep[];
-  pick?: { product: CatalogProduct; reason: string; by: "ai" | "code" };
+  pick?: { product: CatalogProduct; reason: string; by: "ai" | "code"; quantity?: number; total?: number; total_line?: string | null };
   checks?: CheckResult[];
   policy?: Policy | null;
   decision?: Decision;
@@ -91,8 +91,11 @@ export default function Shopping({ approval }: { approval: string }) {
         <div className="rounded-xl border border-zinc-200 p-4 dark:border-zinc-800">
           <p className="text-lg font-semibold">{p.title}</p>
           <p className="text-zinc-600 dark:text-zinc-400">
-            {money(p.price)} at {p.store}
+            {money(p.price)} each at {p.store}
           </p>
+          {result.pick?.total_line && (
+            <p className="mt-1 font-medium tabular-nums">Total for {result.pick.quantity}: {result.pick.total_line}</p>
+          )}
           <p className="mt-3">
             <span className="text-sm font-medium uppercase tracking-wide text-zinc-500">
               Why this one{result.pick?.by === "ai" ? " (written by the AI)" : ""}:

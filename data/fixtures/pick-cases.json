@@ -885,6 +885,7 @@
       "id": "quantity-total-01",
       "trap": "quantity-total",
       "shopper_words": "3 bottles of dish soap refill, under $50 for all of them.",
+      "quantity": 3,
       "options": [
         {
           "id": "opt-a",

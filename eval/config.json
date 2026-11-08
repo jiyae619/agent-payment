@@ -1,11 +1,29 @@
 {
-  "task": "checker",
-  "models": ["claude-sonnet-5", "gpt-5-6-luna", "claude-haiku-4-5"],
+  "task": "pick",
+  "models": [
+    "claude-sonnet-5",
+    "gpt-5-6-luna",
+    "claude-haiku-4-5"
+  ],
   "cases": [],
   "runs": 3,
   "concurrency": 5,
   "checker": {
-    "models": ["claude-sonnet-5", "gpt-5-6-luna", "mistral-large-3", "claude-haiku-5-5"],
+    "models": [
+      "claude-sonnet-5",
+      "gpt-5-6-luna",
+      "mistral-large-3",
+      "claude-haiku-5-5"
+    ],
+    "cases": [],
+    "runs": 3
+  },
+  "pick": {
+    "models": [
+      "claude-sonnet-5",
+      "gpt-5-6-luna",
+      "mistral-large-3"
+    ],
     "cases": [],
     "runs": 3
   }

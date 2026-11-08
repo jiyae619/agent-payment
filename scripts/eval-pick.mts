@@ -1,23 +1,44 @@
 // Pick-step eval: runs the app's own pick() (lib/pick.ts) on every case in
 // data/fixtures/pick-cases.json, k times per model, scored by scripts/pick-score.mts (pass^k).
 // Run: npm run eval-pick -- claude-sonnet-5:low claude-haiku-5-5 --runs=3 [case-id ...]
-// Calls the Anthropic API directly (ANTHROPIC_API_KEY). Synthetic data, not user research.
+// Calls the Anthropic API directly (ANTHROPIC_API_KEY), or, inside `ast project start`, every model
+// through the Astropods AI Gateway (models and runs from eval/config.json "pick"), with the same
+// prompt, message and answer handling (lib/pick-core.ts). Synthetic data, not user research.
 
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import type { CatalogProduct } from "../lib/catalog.ts";
-import { pick, type PickModel } from "../lib/pick.ts";
+import { acceptPick, optionsForAI, PICK_SYSTEM, PickAnswer, pickMessage, type Candidate, type Pick } from "../lib/pick-core.ts";
 import { passK } from "./pass-k.mts";
 import { scorePick, type PickCase, type PickOption } from "./pick-score.mts";
 
+type PickModel = { model: string; effort?: "low" | "medium" | "high" };
+const gateway = Boolean(process.env.ASTRO_GATEWAY_URL);
+const config = gateway ? JSON.parse(await readFile(new URL("../eval/config.json", import.meta.url), "utf8")).pick : null;
+
 const args = process.argv.slice(2);
-const runs = Number(args.find((a) => a.startsWith("--runs="))?.slice(7) ?? 3);
-const models: PickModel[] = args
-  .filter((a) => !a.startsWith("--") && a.includes("claude"))
-  .map((a) => {
-    const [model, effort] = a.split(":");
-    return { model, effort: effort as PickModel["effort"] };
-  });
-const only = args.filter((a) => !a.startsWith("--") && !a.includes("claude"));
+const runs = gateway ? Number(config.runs ?? 3) : Number(args.find((a) => a.startsWith("--runs="))?.slice(7) ?? 3);
+const modelArgs: string[] = gateway ? config.models : args.filter((a) => !a.startsWith("--") && a.includes("claude"));
+let models: PickModel[] = modelArgs.map((a) => {
+  const [model, effort] = a.split(":");
+  return { model, effort: effort as PickModel["effort"] };
+});
+const only: string[] = gateway ? (config.cases ?? []) : args.filter((a) => !a.startsWith("--") && !a.includes("claude"));
+
+// One pick, the app's way, on either route.
+async function runPick(m: PickModel, words: string, candidates: Candidate[], quantity: number): Promise<Pick> {
+  if (!gateway) {
+    const { pick } = await import("../lib/pick.ts"); // Anthropic SDK: not in the container
+    const p = await pick(words, candidates, quantity, m);
+    if (!p) throw new Error("no pick");
+    return p;
+  }
+  const { options, codePick } = optionsForAI(candidates);
+  if (codePick) return codePick;
+  const { chatJSON } = await import("../lib/llm-gateway.ts");
+  const r = await chatJSON({ model: m.model, system: PICK_SYSTEM, user: pickMessage(words, options, quantity), schema: PickAnswer, schemaName: "pick", maxTokens: 2000 });
+  if (!r.data && r.error) throw new Error(r.error);
+  return { ...acceptPick(options, r.data), usage: { input_tokens: r.usage.input, output_tokens: r.usage.output } };
+}
 if (models.length === 0) throw new Error("Name at least one model, e.g. claude-sonnet-5:low");
 
 const fixtures = JSON.parse(await readFile(new URL("../data/fixtures/pick-cases.json", import.meta.url), "utf8"));
@@ -31,6 +52,23 @@ const product = (o: PickOption): CatalogProduct => ({
 type Row = { model: string; caseId: string; run: number; pickedId: string; reason: string; by: string; findings: { severity: string; problem: string }[]; ms: number; in: number; out: number; error?: string };
 const rows: Row[] = [];
 const label = (m: PickModel) => (m.effort ? `${m.model}:${m.effort}` : m.model);
+const candidates = (c: PickCase): Candidate[] => c.options.map((o) => ({ product: product(o), checks: o.checks }));
+
+// On the gateway, probe each model with one AI-path case first and skip any it doesn't serve.
+if (gateway) {
+  const probe = cases.find((c) => c.trap !== "code-path")!;
+  const ok: PickModel[] = [];
+  for (const m of models) {
+    try {
+      await runPick(m, probe.shopper_words, candidates(probe), probe.quantity ?? 1);
+      ok.push(m);
+    } catch (err) {
+      console.log(`Skipping ${label(m)}: ${(err as Error).message.slice(0, 200)}`);
+    }
+  }
+  models = ok;
+}
+
 const jobs = models.flatMap((m) => cases.flatMap((c) => Array.from({ length: runs }, (_, run) => ({ m, c, run }))));
 
 await Promise.all(
@@ -39,8 +77,7 @@ await Promise.all(
       const { m, c, run } = j;
       const t0 = Date.now();
       try {
-        const p = await pick(c.shopper_words, c.options.map((o) => ({ product: product(o), checks: o.checks })), m);
-        if (!p) throw new Error("no pick");
+        const p = await runPick(m, c.shopper_words, candidates(c), c.quantity ?? 1);
         const a = { pickedId: p.product.id, reason: p.reason, by: p.by };
         rows.push({ model: label(m), caseId: c.id, run, ...a, findings: scorePick(c, a), ms: Date.now() - t0, in: p.usage?.input_tokens ?? 0, out: p.usage?.output_tokens ?? 0 });
       } catch (err) {

@@ -5,6 +5,7 @@ import { decide, type Proposal } from "@/lib/enforce.ts";
 import { captureHold, placeHold, releaseHold } from "@/lib/hold.ts";
 import { PayPalError } from "@/lib/paypal.ts";
 import { pick } from "@/lib/pick.ts";
+import { totalLine } from "@/lib/pick-core.ts";
 import { searchProducts } from "@/lib/search.ts";
 import { isNamedItem, searchQuery, shortlist } from "@/lib/shortlist.ts";
 
@@ -42,9 +43,10 @@ export async function POST(request: Request) {
   } catch {
     return Response.json({ ...base, error: "The AI couldn't check the products right now. Nothing was held or bought." }, { status: 502 });
   }
+  const quantity = m.checkout.line_items[0]?.quantity ?? 1;
   let chosen;
   try {
-    chosen = await pick(m.source_text, checked);
+    chosen = await pick(m.source_text, checked, quantity);
   } catch {
     // The pick is a convenience: if the AI is unavailable, the code's top-ranked option is used.
     chosen = { product: checked[0].product, reason: "It ranked first on what you asked for.", by: "code" as const };
@@ -52,7 +54,6 @@ export async function POST(request: Request) {
   if (!chosen) return Response.json({ ...base, outcome: "nothing_found", message: "Nothing matched your limits." });
   const c = checked.find((x) => x.product.id === chosen.product.id)!;
 
-  const quantity = m.checkout.line_items[0]?.quantity ?? 1;
   const proposal: Proposal = {
     product: c.product,
     quantity,
@@ -63,7 +64,7 @@ export async function POST(request: Request) {
   };
   const shown = {
     ...base,
-    pick: { product: c.product, reason: chosen.reason, by: chosen.by },
+    pick: { product: c.product, reason: chosen.reason, by: chosen.by, quantity, total: proposal.total, total_line: totalLine(c.product.price, quantity) },
     checks: c.checks,
     policy: c.policy,
     shortlist: checked.map((x) => ({ id: x.product.id, title: x.product.title, price: x.product.price, store: x.product.store })),
