@@ -7,6 +7,7 @@ import { useMemo, useState } from "react";
 import type { Mandate } from "@/lib/mandate.ts";
 import { LABEL_TEXT, readbackRows, type Label } from "@/lib/readback.ts";
 import { applyFix, findWarnings, type Warning } from "@/lib/warnings.ts";
+import AttackDemo from "./attack-demo";
 import Shopping from "./shopping";
 
 const STARTERS = [
@@ -112,6 +113,7 @@ export default function Assistant() {
         />
       )}
       {mandate && approval && <Shopping key={approval.token} approval={approval.token} />}
+      <AttackDemo />
     </main>
   );
 }
