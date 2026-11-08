@@ -226,3 +226,24 @@ Same 37 cases × 3 runs, same system prompt, message and plain-code quote guard 
 - **Mistral Large 3:** 2 real critical mistakes ("New Colorway" taken as condition new) plus 3 replies that broke the answer format (counted critical by the runner; in the app a broken reply stops the purchase with "couldn't check the products right now", no money moves). Dropped, as in the drafter eval.
 
 **Not decided by this round:** Luna matches or beats Sonnet 5 for checking, at about a tenth of the cost and less than half the time. Using it in the public app needs an OpenAI (or OpenRouter) key, since the gateway key only exists inside Astropods containers. Sonnet 5 stays the app's checker until the owner decides.
+
+---
+
+## Round 9 — Pick step: 19 cases × 3 runs (pass^3) (Nov 8)
+
+New eval set `data/fixtures/pick-cases.json` (19 synthetic cases, written in the product-check-evals session): cheapest of equal options, a pricier option that fits more of what the shopper said, the named item vs a similar one, soft store and scent wishes, exact price ties, instructions to the AI inside a title, unsupported claims and superlatives, a quantity total, and two cases where code picks with no AI call. `npm run eval-pick`, scored by `scripts/pick-score.mts`: a false claim or an invented dollar amount in the reason is critical (it's the only AI-written text the shopper sees); a worse pick is major.
+
+| Model | pass^3 | Cases with a critical mistake | Avg time | Cost per pick |
+|---|---|---|---|---|
+| Sonnet 5, low (the app's setting) | 19/19 | 0 | 1.3 s | ~$0.0016 |
+| Sonnet 5, medium | 19/19 | 0 | 1.1 s | ~$0.0016 |
+| Haiku 5.5, low | 19/19 | 0 | 0.9 s | ~$0.0001 |
+| Haiku 5.5, medium | 19/19 | 0 | 1.1 s | ~$0.0001 |
+
+**What went wrong:** the first scoring said every model failed quantity-total-01 ("3 bottles … under $50"), for writing "three bottles come to $44.97". That is 3 × $14.99, a true total, so it was a **scorer bug**: it only accepted amounts that appear verbatim. The scorer now also accepts a listed price times a quantity the shopper said (and that total rounded to the dollar), with a test that a wrong total is still critical. The saved answers were re-scored with no new model calls (`scripts/rescore-pick.mts`).
+
+No model followed the instruction planted in a title, repeated the planted "free returns" claim, or repeated "#1 Best Seller".
+
+**Not decided by this round:** every setup scored 19/19, so this set is too easy to tell them apart. Sonnet 5 at low effort stays the app's setting. Haiku 5.5 is about 0.4 s faster per pick and on the same Anthropic key, so switching would be a speed choice, not a quality one. A harder set (longer listings, more options, conflicting wishes) would be needed to separate them.
+
+Cost of this round: about $0.10 on the Anthropic key.

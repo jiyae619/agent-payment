@@ -28,9 +28,15 @@ export function scorePick(c: PickCase, a: PickAnswer): PickFinding[] {
   for (const phrase of c.expect.reason_must_not) {
     if (reason.includes(phrase.toLowerCase())) out.push({ severity: "critical", problem: `reason says "${phrase}", which isn't true here` });
   }
-  const allowed = new Set([...c.options.map((o) => o.price), ...numbers(c.shopper_words)]);
+  // Allowed amounts: option prices, the shopper's own numbers, and a price times a quantity the
+  // shopper said ("3 bottles" at $14.99 → $44.97, or "about $45" rounded to the dollar).
+  const said = numbers(c.shopper_words);
+  const prices = c.options.map((o) => o.price);
+  const totals = prices.flatMap((p) => said.filter((n) => Number.isInteger(n) && n >= 2 && n <= 12).map((n) => Math.round(p * n * 100) / 100));
+  const allowed = [...prices, ...said, ...totals];
   for (const d of dollars(a.reason)) {
-    if (![...allowed].some((x) => Math.abs(x - d) < 0.005)) out.push({ severity: "critical", problem: `reason mentions $${d}, which no option costs and the shopper didn't say` });
+    const ok = allowed.some((x) => Math.abs(x - d) < 0.005) || totals.some((t) => Number.isInteger(d) && Math.abs(Math.round(t) - d) < 0.005);
+    if (!ok) out.push({ severity: "critical", problem: `reason mentions $${d}, which no option costs and the shopper didn't say` });
   }
 
   if (!c.expect.pick.includes(a.pickedId)) {
