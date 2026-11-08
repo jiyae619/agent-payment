@@ -35,8 +35,14 @@ export type Case = {
 export type Finding = { id: string; severity: Severity; problem: string };
 
 // The text the checker may quote from: what the store says about the item.
+// The labelled lines ("waterproof-level: Waterproof", "Sizes: 7, 8") are what the app's checker is shown
+// (lib/check-product.ts listingText), so a quote copied from them is still the store's own words.
 export const listingText = (l: Listing) =>
-  [l.title, l.description ?? "", ...l.key_features, ...Object.values(l.attributes), ...l.sizes, l.condition ?? ""].join("\n");
+  [
+    l.title, l.description ?? "", ...l.key_features, ...Object.values(l.attributes), ...l.sizes, l.condition ?? "",
+    ...Object.entries(l.attributes).map(([k, v]) => `${k}: ${v}`),
+    l.sizes.length ? `Sizes: ${l.sizes.join(", ")}` : "", l.condition ? `Condition: ${l.condition}` : "",
+  ].join("\n");
 
 const lower = (s: string) => s.toLowerCase();
 

@@ -162,7 +162,48 @@ The shopping step now calls two more AI steps, both on placeholder settings unti
 
 | Step | File | Setting for now | Guard around it (plain code) |
 |---|---|---|---|
-| Product checker | `lib/check-product.ts` (prompt in `lib/check-prompt.ts`) | Claude Sonnet 5, high effort | Every "checked" or "didn't match" must quote words found in the listing or the store's policy; otherwise it becomes "couldn't check" |
+| Product checker | `lib/check-product.ts` (prompt in `lib/check-prompt.ts`) | Claude Sonnet 5, high effort (**chosen in Round 7**) | Every "checked" or "didn't match" must quote words found in the listing or the store's policy; otherwise it becomes "couldn't check" |
 | Pick | `lib/pick.ts` | Claude Sonnet 5, low effort | Only sees products that passed every filter; an answer naming no listed product is ignored; enforcement re-checks the pick |
 
 Next: run the 37 product-check cases (`data/fixtures/product-checks.json`) against the checker prompt for a few models, scored by `scripts/product-check-score.mts`.
+
+---
+
+## Round 7 — Product checker: 37 cases × 3 runs (pass^3) (Nov 7)
+
+`npm run eval-checker -- <model[:effort]> … --runs=3`. Runs the app's own checker code (`checkProduct`, including the plain-code quote guard) on Anthropic's API, scored by `scripts/product-check-score.mts`. A case passes only with no critical or major mistake in any of its 3 runs. Prices from Anthropic's model table (Sonnet 5 $2 / $10, Haiku 4.5 $1 / $5, Haiku 5.5 $0.10 / $0.50 per million tokens in / out).
+
+**First pass (prompt as built):**
+
+| Model | pass^3 | Cases with a critical mistake | Cost per check |
+|---|---|---|---|
+| Sonnet 5, high | 31/37 | 0 | ~$0.003 |
+| Sonnet 5, medium | 30/37 | 0 | ~$0.003 |
+| Haiku 4.5 | 27/37 | **1** ("New Colorway" taken as condition: new) | ~$0.001 |
+
+**What went wrong, and what was changed:**
+
+| Problem | Cause | Fix |
+|---|---|---|
+| "Water-resistant" for waterproof, a listing contradicting itself, and women's-only sizes for a men's 8 were answered **didn't match**; the labels say **couldn't check** | **Our prompt contradicted the labels**: it gave "water-resistant" as a didn't-match example. The labels were reviewed in Round 1, so the prompt was changed to match them. Either answer releases the hold, so no money was at risk | Prompt: didn't match only when the store plainly rules it out; weaker, self-contradicting or different-system claims are couldn't check |
+| "Citrus Grove" (a brand) taken as a citrus scent; "New Colorway" taken as condition new | Words describing something else counted as proof | Prompt: a word inside a brand or product name, or describing something else, proves nothing |
+| scorer called real quotes like "Sizes: 7, 8, …" invented | The app shows the AI labelled lines; the scorer only knew the bare values | Scorer accepts the same labelled lines the app shows |
+
+**After the fixes:**
+
+| Model | pass^3 | Cases with a critical mistake | Avg time | Cost per check |
+|---|---|---|---|---|
+| **Sonnet 5, high** | **34/37** | **0** | 1.3 s | ~$0.0033 |
+| Haiku 5.5, medium | 33/37 | 0 | 1.1 s | ~$0.0002 |
+| Haiku 5.5, high | 32/37 | 0 | 1.3 s | ~$0.0002 |
+
+What's left for Sonnet 5:
+- **quantity-refills-3x** ("3 bottles"): all models fail it, but the app never sends quantity to the checker (quantity is enforced in plain code), so it doesn't affect purchases.
+- **size-womens-only**: still "didn't match" instead of "couldn't check"; the hold is released either way.
+- **waterproof-pass-momentum**: flagged "check by hand". Its quote "Waterproof" is the store's own attribute value, a valid proof; read by hand and counted as correct.
+
+Haiku 5.5's extra misses are over-caution: it said "couldn't check" when the title plainly says "Waterproof" (3 of 3 runs), which would release the hold on a good product.
+
+**Decision: Claude Sonnet 5, high effort, for the product checker.** Zero critical mistakes, the most requirements proven, about $0.01 per purchase (3 checks). Haiku 5.5 is the fallback if cost ever matters: also zero critical, about 18× cheaper.
+
+Cost of this round: about $1.20 on the Anthropic key. **Caution:** the two prompt rules were found on the same 37 cases they were re-scored on, so these scores are optimistic.
