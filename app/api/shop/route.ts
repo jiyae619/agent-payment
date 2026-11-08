@@ -132,6 +132,12 @@ export async function POST(request: Request) {
         if (decision.action === "void") {
           const released = await releaseHold(hold.authorizationId);
           note(`PayPal released the hold: ${decision.reasons.map((r) => r.message).join(" ")}`);
+          // Loop 2 (anonymous): which rules released it, at which store, and which requirement couldn't be checked.
+          console.info(`[outcome] ${JSON.stringify({
+            at: new Date().toISOString(), outcome: "released", store: c.product.store,
+            rules: decision.reasons.map((r) => r.rule),
+            unchecked: c.checks.filter((x) => x.verdict !== "checked").map((x) => ({ attr: x.attr, verdict: x.verdict })),
+          })}`);
           const status = await readOrder(hold.orderId);
           const proof = record(decision, { ...ids, status: status.authorization ?? released.status });
           return finish(200, { ...shown, outcome: "released", decision, paypal: { ...paypal, status: released.status, readBack: status }, proof, proof_seal: sealProof(proof) });

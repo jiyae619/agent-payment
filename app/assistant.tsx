@@ -34,10 +34,16 @@ export default function Assistant() {
   const [loading, setLoading] = useState(false);
   // Sealed by the server once the shopper approves; shopping sends it back.
   const [approval, setApproval] = useState<string | null>(null);
+  // Opt-in, off by default: share "before → after" when the shopper rewrites their request.
+  const [shareEdit, setShareEdit] = useState(false);
 
   async function readBack() {
     setLoading(true);
     setError(null);
+    const before = mandate?.source_text;
+    if (before && shareEdit && before.trim() !== text.trim()) {
+      void fetch("/api/feedback", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind: "request_edit", before, after: text }) }).catch(() => {});
+    }
     try {
       const res = await fetch("/api/draft", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text }) });
       const data = await res.json().catch(() => ({}));
@@ -87,7 +93,13 @@ export default function Assistant() {
             {loading ? "Reading your request…" : "Show me what it will do"}
           </button>
           {mandate && (
-            <button type="button" className="link" onClick={() => setEditing(false)}>Cancel</button>
+            <>
+              <label className="consent">
+                <input type="checkbox" checked={shareEdit} onChange={(e) => setShareEdit(e.target.checked)} />
+                <span>Share this correction to help improve the assistant<span className="note">Only your before and after words. No PayPal details.</span></span>
+              </label>
+              <button type="button" className="link" onClick={() => setEditing(false)}>Cancel</button>
+            </>
           )}
           {error && <p role="alert" className="alert">{error}</p>}
         </section>
