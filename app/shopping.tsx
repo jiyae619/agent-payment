@@ -19,9 +19,25 @@ type ShopResult = {
   checks?: CheckResult[];
   policy?: Policy | null;
   decision?: Decision;
-  paypal?: { orderId?: string; authorizationId?: string; held?: number; captureId?: string; amount?: number; status?: string };
+  paypal?: {
+    orderId?: string; authorizationId?: string; held?: number; captureId?: string; amount?: number; status?: string;
+    readBack?: { order: string; authorization: string | null; capture: { id: string; status: string; amount: number } | null };
+  };
   pending?: string;
+  proof?: { who_covers: string[]; events: { at: string; what: string }[]; paypal: { order_id: string } };
+  proof_seal?: string;
 };
+
+// Save as proof: the sealed record as a file the shopper keeps.
+function saveProof(proof: unknown, seal: string, orderId: string) {
+  const blob = new Blob([JSON.stringify({ proof, seal, check_at: "/api/proof/verify" }, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `purchase-proof-${orderId}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
 const money = (n: number) => `$${Number.isInteger(n) ? n : n.toFixed(2)}`;
 const VERDICT: Record<CheckResult["verdict"], { text: string; className: string }> = {
@@ -109,7 +125,9 @@ export default function Shopping({ approval }: { approval: string }) {
                 <li key={i}>
                   <span className={`font-medium ${VERDICT[c.verdict].className}`}>{VERDICT[c.verdict].text}</span>{" "}
                   {c.value === "yes" ? c.attr : `${c.attr}: ${c.value}`}
-                  {c.quote && <span className="block text-sm text-zinc-500">The store says: &ldquo;{c.quote}&rdquo;</span>}
+                  <span className="block text-sm text-zinc-500">
+                    {c.quote ? <>The store says: &ldquo;{c.quote}&rdquo;</> : "The listing doesn't say."}
+                  </span>
                 </li>
               ))}
             </ul>
@@ -127,7 +145,56 @@ export default function Shopping({ approval }: { approval: string }) {
       )}
 
       <Outcome result={result} busy={busy} onAnswer={answer} />
+      {(result.outcome === "bought" || result.outcome === "released") && !result.error && <Receipt result={result} />}
     </section>
+  );
+}
+
+function Receipt({ result }: { result: ShopResult }) {
+  const pp = result.paypal;
+  const rb = pp?.readBack;
+  return (
+    <div className="space-y-4 rounded-xl border border-zinc-200 p-4 dark:border-zinc-800">
+      <h3 className="text-lg font-semibold">Receipt</h3>
+      {result.proof && (
+        <div>
+          <p className="text-sm font-medium uppercase tracking-wide text-zinc-500">Who covers this?</p>
+          <ul className="mt-1 list-disc space-y-1 pl-5">
+            {result.proof.who_covers.map((line, i) => <li key={i}>{line}</li>)}
+          </ul>
+        </div>
+      )}
+      {result.proof && result.proof_seal && (
+        <div>
+          <button
+            type="button"
+            onClick={() => saveProof(result.proof, result.proof_seal!, result.proof!.paypal.order_id)}
+            className="rounded-lg border border-zinc-400 px-4 py-2 font-medium hover:bg-zinc-100 dark:border-zinc-600 dark:hover:bg-zinc-800"
+          >
+            Save as proof
+          </button>
+          <p className="mt-1 text-sm text-zinc-500">
+            A sealed file with your words, what you approved, every check with the store&apos;s words, the return policy as it was today, and the PayPal IDs.
+          </p>
+        </div>
+      )}
+      <details>
+        <summary className="cursor-pointer font-medium">Details</summary>
+        <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
+          <dt className="text-zinc-500">PayPal order</dt><dd className="font-mono">{pp?.orderId}</dd>
+          <dt className="text-zinc-500">Hold</dt><dd className="font-mono">{pp?.authorizationId}</dd>
+          {pp?.captureId && (<><dt className="text-zinc-500">Charge</dt><dd className="font-mono">{pp.captureId}</dd></>)}
+          {rb && (<><dt className="text-zinc-500">PayPal says now</dt><dd>order {rb.order.toLowerCase()}, hold {rb.authorization?.toLowerCase() ?? "none"}{rb.capture ? `, charge ${rb.capture.status.toLowerCase()} for ${money(rb.capture.amount)}` : ""}</dd></>)}
+        </dl>
+        {result.proof && (
+          <ol className="mt-3 space-y-1 text-sm">
+            {result.proof.events.map((e, i) => (
+              <li key={i}><span className="font-mono text-zinc-500">{new Date(e.at).toLocaleTimeString()}</span> {e.what}</li>
+            ))}
+          </ol>
+        )}
+      </details>
+    </div>
   );
 }
 

@@ -18,6 +18,14 @@ function secret(): string {
 
 const sign = (payload: string) => createHmac("sha256", secret()).update(payload).digest("base64url");
 
+// A seal over readable text (the proof record), and its check.
+export const signText = (text: string): string => sign(text);
+export function verifyText(text: string, mac: string): boolean {
+  const expected = Buffer.from(sign(text));
+  const given = Buffer.from(String(mac));
+  return expected.length === given.length && timingSafeEqual(expected, given);
+}
+
 // Any server-made data the browser carries between steps (the approval, a purchase waiting for the
 // shopper's answer) is sealed the same way.
 export function seal(data: unknown): string {

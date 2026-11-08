@@ -1,8 +1,9 @@
 import { createHash } from "node:crypto";
 import { ApprovalError, openApproval, seal } from "@/lib/approval.ts";
 import { checkProduct } from "@/lib/check-product.ts";
-import { decide, type Proposal } from "@/lib/enforce.ts";
-import { captureHold, placeHold, releaseHold } from "@/lib/hold.ts";
+import { decide, type Decision, type Proposal } from "@/lib/enforce.ts";
+import { captureHold, placeHold, readOrder, releaseHold } from "@/lib/hold.ts";
+import { buildProof, sealProof, type PayPalRecord, type ProofEvent } from "@/lib/proof.ts";
 import { PayPalError } from "@/lib/paypal.ts";
 import { pick } from "@/lib/pick.ts";
 import { totalLine } from "@/lib/pick-core.ts";
@@ -72,21 +73,40 @@ export async function POST(request: Request) {
 
   // 3. PayPal holds the real total on the saved account; enforcement decides what happens to it.
   const key = createHash("sha256").update(`${body.approval}|${c.product.id}`).digest("hex").slice(0, 32);
+  const events: ProofEvent[] = [{ at: approved.approved_at, what: "You approved these instructions with PayPal." }];
+  const note = (what: string) => events.push({ at: new Date().toISOString(), what });
+  const record = (decision: Decision, paypal: PayPalRecord) =>
+    buildProof({
+      mandate: m, approved_at: approved.approved_at, search: { source: search.source, funnel, shortlist: shown.shortlist },
+      product: c.product, quantity, total: proposal.total, reason: chosen.reason, by: chosen.by, checks: c.checks, policy: c.policy,
+      decision, paypal, events,
+    });
   try {
     const hold = await placeHold(vaultId, c.product.title, proposal.total, key);
+    note(`PayPal held $${hold.amount.toFixed(2)} for "${c.product.title}".`);
     const decision = decide(m, proposal, { now: new Date(), held: hold.amount });
     const paypal = { orderId: hold.orderId, authorizationId: hold.authorizationId, held: hold.amount };
+    const base: PayPalRecord = { order_id: hold.orderId, authorization_id: hold.authorizationId, held: hold.amount };
 
     if (decision.action === "capture") {
       const capture = await captureHold(hold.authorizationId, decision.amount, max);
-      return Response.json({ ...shown, outcome: "bought", decision, paypal: { ...paypal, ...capture } });
+      note(`Every check passed, so PayPal took $${capture.amount.toFixed(2)}.`);
+      const status = await readOrder(hold.orderId);
+      const proof = record(decision, { ...base, capture_id: capture.captureId, captured: capture.amount, status: status.authorization ?? status.order });
+      return Response.json({ ...shown, outcome: "bought", decision, paypal: { ...paypal, ...capture, readBack: status }, proof, proof_seal: sealProof(proof) });
     }
     if (decision.action === "void") {
       const released = await releaseHold(hold.authorizationId);
-      return Response.json({ ...shown, outcome: "released", decision, paypal: { ...paypal, status: released.status } });
+      note(`PayPal released the hold: ${decision.reasons.map((r) => r.message).join(" ")}`);
+      const status = await readOrder(hold.orderId);
+      const proof = record(decision, { ...base, status: status.authorization ?? released.status });
+      return Response.json({ ...shown, outcome: "released", decision, paypal: { ...paypal, status: released.status, readBack: status }, proof, proof_seal: sealProof(proof) });
     }
-    // Ask: the hold stays open while the shopper decides. The answer route only accepts this sealed record.
-    const pending = seal({ authorizationId: hold.authorizationId, amount: proposal.total, limit: max, title: c.product.title });
+    // Ask: the hold stays open while the shopper decides. The answer route only accepts this sealed
+    // record, which also carries the proof so far.
+    note(`It asked you first: ${decision.checkins.map((x) => x.message).join(" ")}`);
+    const proof = record(decision, { ...base, status: hold.status });
+    const pending = seal({ authorizationId: hold.authorizationId, orderId: hold.orderId, amount: proposal.total, limit: max, title: c.product.title, proof });
     return Response.json({ ...shown, outcome: "ask", decision, paypal, pending });
   } catch (err) {
     if (err instanceof PayPalError) {

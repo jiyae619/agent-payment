@@ -33,6 +33,19 @@ export async function captureHold(authorizationId: string, amount: number, limit
   return { captureId: String(capture.id), status: String(capture.status), amount };
 }
 
+// What PayPal itself says now, for the receipt: read back, never assumed from our own calls.
+export async function readOrder(orderId: string) {
+  const order: Json = await paypal("GET", `/v2/checkout/orders/${orderId}`);
+  const payments = order?.purchase_units?.[0]?.payments ?? {};
+  const auth = payments.authorizations?.[0];
+  const capture = payments.captures?.[0];
+  return {
+    order: String(order.status),
+    authorization: auth ? String(auth.status) : null,
+    capture: capture ? { id: String(capture.id), status: String(capture.status), amount: Number(capture.amount?.value) } : null,
+  };
+}
+
 export async function releaseHold(authorizationId: string) {
   await paypal("POST", `/v2/payments/authorizations/${authorizationId}/void`, {}, { requestId: stepRequestId(authorizationId, "void") });
   const auth: Json = await paypal("GET", `/v2/payments/authorizations/${authorizationId}`);
