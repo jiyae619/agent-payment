@@ -1,0 +1,19 @@
+{
+  "_note": "Short excerpts copied word for word from each store's own policy page, with the page and the date they were read. Only stores whose official page could be read are listed: a store missing here means its policy couldn't be checked, never that it has none.",
+  "policies": [
+    {
+      "store": "nike.com",
+      "topic": "returns",
+      "text": "We give you 60 days to try out your Nike purchase to make sure it works for you. Returns are free for Nike Members.",
+      "url": "https://www.nike.com/help/a/returns-policy",
+      "retrieved": "2026-11-07"
+    },
+    {
+      "store": "grove.co",
+      "topic": "returns",
+      "text": "If an item wasn’t right for you, reach out to us within 30 days of delivery. We’ll send you a pre-paid shipping label so you can make a seamless return and get a full refund.",
+      "url": "https://www.grove.co/g/shipping-returns/",
+      "retrieved": "2026-11-07"
+    }
+  ]
+}
