@@ -17,6 +17,8 @@ import {
 type Body = Record<string, Json>;
 
 export async function POST(request: Request, ctx: { params: Promise<{ action: string }> }) {
+  // Developer test bench only: not served on the public demo.
+  if (process.env.NODE_ENV === "production") return Response.json({ error: "Not found" }, { status: 404 });
   const { action } = await ctx.params;
   const body: Body = await request.json().catch(() => ({}));
   const origin = new URL(request.url).origin;

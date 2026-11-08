@@ -1,0 +1,26 @@
+# Render Blueprint for the public demo. In Render: New → Blueprint → pick this repo.
+# Secrets are entered in Render's dashboard when the Blueprint is created (sync: false);
+# they are never stored in this file or the repo.
+services:
+  - type: web
+    name: shopping-assistant
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /
+    envVars:
+      - key: NODE_VERSION
+        value: "24"
+      - key: APPROVAL_SECRET
+        generateValue: true
+      - key: PAYPAL_CLIENT_ID
+        sync: false
+      - key: PAYPAL_CLIENT_SECRET
+        sync: false
+      - key: PAYPAL_DEMO_VAULT_ID
+        sync: false
+      - key: CHANNEL3_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false

@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { DraftError, draftMandate } from "@/lib/draft.ts";
+import { allowRun, visitorKey } from "@/lib/guard.ts";
 
 // POST { text } → { mandate }
 export async function POST(request: Request) {
@@ -7,6 +8,8 @@ export async function POST(request: Request) {
   const text = String(body.text ?? "").trim();
   if (!text) return Response.json({ error: "Tell the assistant what to buy." }, { status: 400 });
   if (text.length > 1000) return Response.json({ error: "Please keep it under 1,000 characters." }, { status: 400 });
+  const limited = allowRun(visitorKey(request));
+  if (limited) return Response.json({ error: limited }, { status: 429 });
 
   try {
     return Response.json({ mandate: await draftMandate(text) });

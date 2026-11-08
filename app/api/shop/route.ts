@@ -5,6 +5,7 @@ import { decide, type Decision, type Proposal } from "@/lib/enforce.ts";
 import { captureHold, placeHold, readOrder, releaseHold } from "@/lib/hold.ts";
 import { buildProof, sealProof, type PayPalRecord, type ProofEvent } from "@/lib/proof.ts";
 import { PayPalError } from "@/lib/paypal.ts";
+import { allowRun, visitorKey } from "@/lib/guard.ts";
 import { pick } from "@/lib/pick.ts";
 import { totalLine } from "@/lib/pick-core.ts";
 import { searchProducts } from "@/lib/search.ts";
@@ -32,6 +33,8 @@ export async function POST(request: Request) {
   const max = m.payment.amount_range.max;
   const vaultId = m.payment.vault_id;
   if (max === null || !vaultId) return Response.json({ error: "This approval has no spending limit or PayPal account." }, { status: 400 });
+  const limited = allowRun(visitorKey(request));
+  if (limited) return Response.json({ error: limited }, { status: 429 });
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
