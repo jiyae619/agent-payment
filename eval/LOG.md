@@ -151,3 +151,5 @@ Still minor and flaky: refill-07 (the "shop" as ship-to), shoes-08 (ask-before-s
 Cost: about 130 calls on the Anthropic key (the full run, the high-effort check and the pack-size re-test), well under $3.
 
 **Caution:** the pack-size rule was found and re-tested on the same requests, so it's another optimistic result; the friends' requests on Nov 10 are the held-out check.
+
+**Decision (Nov 7): back to high effort.** Owner's call after Round 6: the wrong-store error at medium is the failure this product exists to prevent, and high costs about 1 s more per draft. `lib/draft.ts` now uses `effort: "high"`, the setup that scored 0 critical errors in Round 4 and 3/3 on shoes-07 here.

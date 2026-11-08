@@ -8,9 +8,9 @@ import { DRAFT_SYSTEM } from "./draft-prompt.ts";
 import type { Mandate } from "./mandate.ts";
 
 // Chosen by the model eval (eval/LOG.md, Round 4): the only model with zero critical errors.
-// Medium effort is cheaper and faster than Sonnet 5's default (high); re-checked in Round 5.
+// High effort (Sonnet 5's default): at medium it wrote brooks.com for "Brooks" (eval/LOG.md, Round 6).
 const MODEL = "claude-sonnet-5";
-const EFFORT = "medium";
+const EFFORT = "high";
 
 export class DraftError extends Error {}
 
