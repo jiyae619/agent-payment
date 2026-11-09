@@ -131,8 +131,8 @@ export default function Assistant() {
               </button>
             ))}
             <a className="try-card" href="#attack">
-              <b>Gift-card trap</b>
-              <span>A web page tells the agent to buy a gift card</span>
+              <b>Prompt-injection trap</b>
+              <span>A web page hides orders for the agent</span>
             </a>
           </div>
           <button type="button" className="btn primary" onClick={readBack} disabled={loading || !text.trim()}>

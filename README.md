@@ -21,7 +21,7 @@ Built for the PayPal AI Hackathon. PayPal sandbox only: nothing real is ever cha
 
 ## How it works
 
-The app runs one step per screen: **Ask → Approve → Shop → Choose → Pay**. The rule: **the AI recommends and explains; the shopper chooses; code decides whether PayPal may charge.** The [How it works](https://shopping-assistant-z5u2.onrender.com/how-it-works) page plays four real runs (buys, asks first, stops itself, gift-card trap) through this pipeline.
+The app runs one step per screen: **Ask → Approve → Shop → Choose → Pay**. The rule: **the AI recommends and explains; the shopper chooses; code decides whether PayPal may charge.** The [How it works](https://shopping-assistant-z5u2.onrender.com/how-it-works) page plays four real runs (buys, asks first, stops itself, prompt-injection trap) through this pipeline.
 
 | # | Step | Who | Where |
 |---|---|---|---|
