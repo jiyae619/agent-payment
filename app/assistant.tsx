@@ -300,9 +300,11 @@ function Readback(props: {
             checks out, or when you say yes.
           </p>
           <PayPalApprove disabled={busy} onSaved={(token) => void approve(token)} />
-          <button type="button" className="link" onClick={() => void approve()} disabled={busy}>
-            {busy ? "Approving…" : "No PayPal sandbox login? Use the demo account"}
+          <p className="or-line"><span>or</span></p>
+          <button type="button" className="btn secondary" onClick={() => void approve()} disabled={busy}>
+            {busy ? "Approving…" : "Try with the demo account"}
           </button>
+          <p className="approved-line">No PayPal sandbox login needed. It uses a sandbox PayPal account that&apos;s already saved.</p>
           <p className="assure">PayPal sandbox: no real money moves. This demo store stands in for the real shop.{ends ? ` ${ends}.` : ""}</p>
           {error && <p role="alert" className="alert">{error}</p>}
         </div>

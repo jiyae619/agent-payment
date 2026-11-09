@@ -125,6 +125,8 @@ textarea.request { width: 100%; box-sizing: border-box; font: 17px/1.45 var(--fo
 .paypal-slot { min-height: 48px; }
 .paypal-slot paypal-button { display: block; width: 100%; }
 .paypal-slot.off { opacity: .45; pointer-events: none; }
+.or-line { display: flex; align-items: center; gap: 10px; margin: 2px 0; color: var(--muted); font-size: 13px; }
+.or-line::before, .or-line::after { content: ""; flex: 1; border-top: 1px solid var(--line); }
 .consent { display: flex; gap: 10px; align-items: flex-start; font-size: 15px; cursor: pointer; }
 .consent input { width: 20px; height: 20px; margin-top: 2px; flex: none; accent-color: var(--ink); }
 .past { display: grid; gap: 8px; border-top: 1px solid var(--line); padding-top: 12px; }
