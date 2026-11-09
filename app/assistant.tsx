@@ -4,7 +4,7 @@
 // every line below is a fixed template (lib/readback.ts), never AI-written text.
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Mandate } from "@/lib/mandate.ts";
 import { readbackRows, type Label } from "@/lib/readback.ts";
 import { clearHistory, loadHistory } from "@/lib/history.ts";
@@ -12,7 +12,7 @@ import { suggest, type Suggestion } from "@/lib/suggest.ts";
 import { applyFix, findWarnings, type Fix, type Warning } from "@/lib/warnings.ts";
 import AttackDemo from "./attack-demo";
 import PayPalApprove from "./paypal-approve";
-import Shopping from "./shopping";
+import Shopping, { type ShopStage } from "./shopping";
 
 const STARTERS = [
   { label: "Running shoes", watch: "Strict rules: size, free returns, asks above $100", text: "Waterproof running shoes, size 8, under $120. Free returns please. Ask me if it's over $100." },
@@ -27,6 +27,22 @@ export const MARK: Record<Label, { cls: string; sym: string; name: string }> = {
   cant_promise: { cls: "ask", sym: "–", name: "Can't promise" },
 };
 
+// The flow as the shopper walks it, one screen at a time.
+const STEPS = ["Ask", "Approve", "Shop", "Choose", "Pay"];
+
+function Stepper({ current }: { current: number }) {
+  return (
+    <ol className="stepper" aria-label="Steps">
+      {STEPS.map((s, i) => (
+        <li key={s} className={i < current ? "done" : i === current ? "now" : ""} aria-current={i === current ? "step" : undefined}>
+          <span className="stepper-n" aria-hidden>{i < current ? "✓" : i + 1}</span>
+          <span className="stepper-label">{s}</span>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
 export default function Assistant() {
   const [text, setText] = useState("");
   const [mandate, setMandate] = useState<Mandate | null>(null);
@@ -40,6 +56,13 @@ export default function Assistant() {
   const [payer, setPayer] = useState<string | null>(null);
   // Opt-in, off by default: share "before → after" when the shopper rewrites their request.
   const [shareEdit, setShareEdit] = useState(false);
+  const [shopStage, setShopStage] = useState<ShopStage>(2);
+  const onStage = useCallback((s: ShopStage) => setShopStage(s), []);
+  const stage = editing || !mandate ? 0 : !approval ? 1 : shopStage;
+  // Each step is its own screen, so a new step starts at the top.
+  useEffect(() => {
+    if (stage < 2) window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [stage]);
 
   async function readBack() {
     setLoading(true);
@@ -79,20 +102,18 @@ export default function Assistant() {
         </nav>
       </header>
 
-      {!mandate && (
+      <Stepper current={stage} />
+
+      {stage === 0 && !mandate && (
         <section className="hero" aria-labelledby="hero-title">
           <h2 id="hero-title">An AI shops for you. PayPal pays only if your rules hold.</h2>
-          <ol className="hero-steps">
-            <li><span><b>Say it</b> in your own words</span></li>
-            <li><span><b>Approve</b> the exact rules, not just a total</span></li>
-            <li><span><b>It shops.</b> PayPal holds the money until every rule checks out</span></li>
-          </ol>
+          <p className="sub">See how it reads your words, watch what it looks at, choose what it found, and only then does PayPal hold the money.</p>
         </section>
       )}
 
       {editing || !mandate ? (
         <section className="sheet" aria-labelledby="ask-title">
-          <span className="step" id="ask-title">1 · What should it buy?</span>
+          <span className="step" id="ask-title">What should it buy?</span>
           <label htmlFor="request" className="sr-only">Your request</label>
           <textarea
             id="request"
@@ -128,7 +149,7 @@ export default function Assistant() {
           )}
           {error && <p role="alert" className="alert">{error}</p>}
         </section>
-      ) : (
+      ) : !approval ? (
         <Readback
           mandate={mandate}
           dismissed={dismissed}
@@ -141,15 +162,17 @@ export default function Assistant() {
           onApproved={(token, approved, who) => {
             setPayer(who);
             setMandate(approved);
+            setShopStage(2);
             setApproval(token);
           }}
         />
+      ) : (
+        <>
+          <p className="approved-line">✓ Approved with {payer ?? "PayPal"} · up to ${mandate.payment.amount_range.max}</p>
+          <Shopping key={approval} approval={approval} request={mandate.source_text} item={mandate.checkout.line_items[0]?.description ?? "anything"} onEdit={edit} onStage={onStage} />
+        </>
       )}
-
-      {mandate && approval && !editing && (
-        <Shopping key={approval} approval={approval} request={mandate.source_text} item={mandate.checkout.line_items[0]?.description ?? "anything"} onEdit={edit} />
-      )}
-      <AttackDemo />
+      {stage === 0 && <AttackDemo />}
     </main>
   );
 }
@@ -221,7 +244,7 @@ function Readback(props: {
 
   return (
     <section className="sheet" aria-labelledby="asked-title">
-      <span className="step" id="asked-title">1 · You asked</span>
+      <span className="step" id="asked-title">You asked</span>
       <div className="quote">&ldquo;{mandate.source_text}&rdquo;</div>
       {!approved && <button type="button" className="link" onClick={props.onEdit}>Edit request</button>}
 

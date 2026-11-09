@@ -99,6 +99,26 @@ textarea.request { width: 100%; box-sizing: border-box; font: 17px/1.45 var(--fo
 .flag .link { margin-left: auto; flex: none; min-height: 0; padding: 0; }
 .flag.bad { background: var(--no-bg); }
 .flag.good { background: var(--ok-bg); }
+
+/* One step per screen: where you are in the flow. */
+.stepper { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
+.stepper li { display: grid; justify-items: center; gap: 4px; font-size: 12px; color: var(--muted); position: relative; }
+.stepper li::before { content: ""; position: absolute; top: 11px; right: 50%; width: 100%; height: 2px; background: var(--line); z-index: 0; }
+.stepper li:first-child::before { display: none; }
+.stepper li.done::before, .stepper li.now::before { background: var(--ink); }
+.stepper-n { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font: 700 11px var(--font-mono), monospace;
+  background: var(--sheet); box-shadow: inset 0 0 0 1.5px var(--line); position: relative; z-index: 1; }
+.stepper li.done .stepper-n { background: var(--ink); color: var(--sheet); box-shadow: none; }
+.stepper li.now .stepper-n { box-shadow: inset 0 0 0 2px var(--ink); color: var(--ink); }
+.stepper li.now { color: var(--ink); font-weight: 700; }
+.approved-line { margin: 0; font-size: 14px; color: var(--muted); }
+.quote.small { font-size: 14px; padding: 8px 10px; margin: 0; }
+
+/* Choose one: up to three checked options. */
+.options { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.option { display: grid; gap: 10px; border-radius: 12px; padding: 12px; box-shadow: inset 0 0 0 1.5px var(--line); position: relative; }
+.option.rec { box-shadow: inset 0 0 0 2px var(--ink); }
+.badge { justify-self: start; font: 500 11px var(--font-mono), monospace; letter-spacing: .06em; text-transform: uppercase; background: var(--ink); color: var(--sheet); border-radius: 4px; padding: 2px 6px; }
 .approve { display: grid; gap: 10px; border-top: 1px solid var(--line); padding-top: 14px; }
 .approve-title { font-weight: 700; font-size: 17px; margin: 0; }
 .paypal-approve { display: grid; gap: 6px; }
@@ -187,6 +207,8 @@ details.more ol { margin: 10px 0 0; padding-left: 18px; font-size: 14px; display
 .hiw-count { font: 500 12px var(--font-mono), monospace; color: var(--muted); }
 .hiw-note { background: var(--soft); border-left: 3px solid var(--accent); border-radius: 6px; padding: 8px 10px; }
 .hiw-guard { color: var(--muted); }
+.hiw-why b { font-weight: 700; }
+.hiw-scenario { display: grid; gap: 6px; background: var(--soft); border-radius: 10px; padding: 10px 12px; font-size: 14px; }
 .hiw-guard b { color: var(--ink); }
 .hiw-file { font: 500 12px var(--font-mono), monospace; color: var(--muted); overflow-wrap: anywhere; }
 .lane-tag { justify-self: start; font: 500 11px var(--font-mono), monospace; letter-spacing: .06em; text-transform: uppercase; border-radius: 4px; padding: 2px 6px; background: var(--soft); color: var(--muted); }

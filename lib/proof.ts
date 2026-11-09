@@ -24,7 +24,7 @@ export type Proof = {
   cant_promise: { phrase: string; reason: string }[];
   instructions: Mandate;
   search: { source: string; funnel: FunnelStep[]; shortlist: { id: string; title: string; price: number; store: string }[] };
-  picked: { id: string; title: string; store: string; price_each: number; quantity: number; total: number; reason: string; reason_written_by: "ai" | "code" };
+  picked: { id: string; title: string; store: string; price_each: number; quantity: number; total: number; reason: string; reason_written_by: "ai" | "code" | "shopper" };
   checks: CheckResult[];
   return_policy: { store: string; url: string; read_on: string; text: string; sha256: string } | null;
   decision: Decision;
@@ -41,7 +41,7 @@ export function buildProof(args: {
   quantity: number;
   total: number;
   reason: string;
-  by: "ai" | "code";
+  by: "ai" | "code" | "shopper";
   checks: CheckResult[];
   policy: Policy | null;
   decision: Decision;

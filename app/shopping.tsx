@@ -1,8 +1,8 @@
 "use client";
 
-// Steps 2 and 3 of the Checkout Sheet: watch it shop (and stop it), see what it picked with the
-// store's own words, answer if it asks, and get the result. The "why" sentence is the only
-// AI-written text on these screens, and it is tagged as such.
+// Steps 3 to 5 of the flow, one screen at a time: watch it shop (and stop it), choose one of up to
+// three checked options, then PayPal holds and code decides (charge, release, or ask you). The
+// "why" sentence is the only AI-written text on these screens, and it is tagged as such.
 
 import { useEffect, useRef, useState } from "react";
 import type { CatalogProduct } from "@/lib/catalog.ts";
@@ -16,12 +16,16 @@ type Step = { step: string; text: string; count?: number };
 type ShelfItem = { id: string; title: string; price: number; store: string; image: string | null };
 type Shelf = { items: ShelfItem[]; kept?: string[]; dropped?: Record<string, string>; checked: Record<string, { ok: number; of: number }>; picked?: string };
 const NO_SHELF: Shelf = { items: [], checked: {} };
+type Option = { product: CatalogProduct; checks: CheckResult[]; policy: Policy | null; total: number; total_line: string | null };
 type ShopResult = {
-  outcome?: "bought" | "released" | "ask" | "nothing_found" | "stopped";
+  outcome?: "choose" | "bought" | "released" | "ask" | "nothing_found" | "stopped";
+  options?: Option[];
+  choice?: string; // sealed options; the server only lets the shopper pick one of these
+  recommended?: { id: string; reason: string; by: "ai" | "code" };
   message?: string;
   error?: string;
   funnel?: FunnelStep[];
-  pick?: { product: CatalogProduct; reason: string; by: "ai" | "code"; quantity?: number; total?: number; total_line?: string | null };
+  pick?: { product: CatalogProduct; reason: string; by: "ai" | "code" | "shopper"; quantity?: number; total?: number; total_line?: string | null };
   checks?: CheckResult[];
   policy?: Policy | null;
   decision?: Decision;
@@ -41,8 +45,7 @@ const STAGES: Step[] = [
   { step: "search", text: "Search stores" },
   { step: "filter", text: "Keep what fits your limits" },
   { step: "check", text: "Check the listings" },
-  { step: "pick", text: "Pick one" },
-  { step: "hold", text: "PayPal holds the money" },
+  { step: "pick", text: "Line up your options" },
 ];
 
 const money = (n: number) => `$${Number.isInteger(n) ? n : n.toFixed(2)}`;
@@ -74,12 +77,18 @@ function sendFeedback(kind: "dont_buy_reason" | "rating", value: string, r: Shop
   }).catch(() => {});
 }
 
-export default function Shopping({ approval, request, item, onEdit }: { approval: string; request: string; item: string; onEdit: () => void }) {
+// Which step of the flow this screen is: 2 shopping, 3 choosing, 4 paying (and the result).
+export type ShopStage = 2 | 3 | 4;
+
+export default function Shopping({ approval, request, item, onEdit, onStage }: { approval: string; request: string; item: string; onEdit: () => void; onStage: (s: ShopStage) => void }) {
   const [steps, setSteps] = useState<Step[]>([]);
   const [shelf, setShelf] = useState<Shelf>(NO_SHELF);
   const [result, setResult] = useState<ShopResult | null>(null);
   const [running, setRunning] = useState(false);
   const [busy, setBusy] = useState<"pay" | "dont" | null>(null);
+  const [buying, setBuying] = useState<string | null>(null);
+  // The options screen, kept so the shopper can go back and choose another after a release.
+  const [options, setOptions] = useState<ShopResult | null>(null);
   const controller = useRef<AbortController | null>(null);
   const started = useRef(false);
 
@@ -90,7 +99,6 @@ export default function Shopping({ approval, request, item, onEdit }: { approval
     setShelf(NO_SHELF);
     setResult(null);
     setRunning(true);
-    let held = false;
     try {
       const res = await fetch("/api/shop", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ approval }), signal: ctrl.signal });
       if (!res.ok || !res.body) {
@@ -111,7 +119,6 @@ export default function Shopping({ approval, request, item, onEdit }: { approval
           if (!line) continue;
           const event = JSON.parse(line);
           if (event.type === "step") {
-            if (event.step === "hold") held = true;
             setSteps((s) => [...s, event]);
             if (event.items) setShelf((sh) => ({ ...sh, items: event.items }));
             if (event.kept) setShelf((sh) => ({ ...sh, kept: event.kept, dropped: event.dropped }));
@@ -124,7 +131,8 @@ export default function Shopping({ approval, request, item, onEdit }: { approval
         }
       }
     } catch {
-      setResult(ctrl.signal.aborted && !held ? { outcome: "stopped" } : { error: "The connection dropped. Check your PayPal activity before trying again." });
+      // Nothing is ever held while shopping, so a dropped connection or Stop can't leave money held.
+      setResult(ctrl.signal.aborted ? { outcome: "stopped" } : { error: "The connection dropped. Nothing was held or charged." });
     } finally {
       setRunning(false);
     }
@@ -137,6 +145,28 @@ export default function Shopping({ approval, request, item, onEdit }: { approval
     void run();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // The shopper picked one option. Only now does PayPal hold money; code then decides.
+  async function buy(productId: string) {
+    if (!result?.choice) return;
+    setBuying(productId);
+    const res = await fetch("/api/shop/buy", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ choice: result.choice, productId }) });
+    const r = await res.json().catch(() => ({ error: "Something went wrong. Nothing was charged." }));
+    setBuying(null);
+    if (!res.ok && !r.pick) {
+      setResult({ ...result, error: r.error ?? "Something went wrong. Nothing was charged." });
+      return;
+    }
+    setOptions(result);
+    setResult(r);
+  }
+
+  // Tell the page which step this is, for the stepper at the top.
+  const stage: ShopStage = running || !result || result.outcome === "stopped" ? 2 : result.outcome === "choose" ? 3 : result.outcome === "nothing_found" ? 2 : 4;
+  useEffect(() => {
+    onStage(stage);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [stage, onStage]);
 
   async function answer(a: "pay" | "dont") {
     if (!result?.pending) return;
@@ -179,14 +209,13 @@ export default function Shopping({ approval, request, item, onEdit }: { approval
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderId, outcome]);
 
-  const held = steps.some((s) => s.step === "hold");
-
   if (running || !result) {
     const got = new Map(steps.map((s) => [s.step, s]));
     const nowIndex = STAGES.findIndex((s) => !got.has(s.step));
     return (
       <section className="sheet" aria-live="polite" aria-labelledby="shop-title">
-        <span className="step" id="shop-title">Shopping…</span>
+        <span className="step" id="shop-title">Shopping for you</span>
+        <p className="quote small">&ldquo;{request}&rdquo;</p>
         <ol className="progress">
           {STAGES.map((s, i) => {
             const ev = got.get(s.step);
@@ -200,10 +229,8 @@ export default function Shopping({ approval, request, item, onEdit }: { approval
           })}
         </ol>
         {shelf.items.length > 0 && <ShelfView shelf={shelf} />}
-        <p className="sub">{held ? "PayPal is holding the money. Not charged yet." : "Nothing is held yet."}</p>
-        {!held && (
-          <button type="button" className="btn secondary" onClick={() => controller.current?.abort()}>Stop</button>
-        )}
+        <p className="sub">Nothing is held yet. You choose before PayPal holds anything.</p>
+        <button type="button" className="btn secondary" onClick={() => controller.current?.abort()}>Stop</button>
       </section>
     );
   }
@@ -221,6 +248,10 @@ export default function Shopping({ approval, request, item, onEdit }: { approval
     );
   }
 
+  if (result.outcome === "choose" && result.options) {
+    return <Choose result={result} buying={buying} onBuy={buy} onEdit={onEdit} />;
+  }
+
   if (result.error && !result.pick) {
     return (
       <section className="sheet" aria-live="polite">
@@ -233,7 +264,7 @@ export default function Shopping({ approval, request, item, onEdit }: { approval
   if (result.outcome === "nothing_found" || !result.pick) {
     return (
       <section className="sheet" aria-live="polite">
-        <span className="step">2 · Nothing found</span>
+        <span className="step">Nothing found</span>
         <p className="title">{result.message ?? "Nothing matched your limits."}</p>
         <button type="button" className="link" onClick={onEdit}>Edit request</button>
       </section>
@@ -242,7 +273,9 @@ export default function Shopping({ approval, request, item, onEdit }: { approval
 
   return (
     <>
-      <Picked result={result} busy={busy} onAnswer={answer} onEdit={onEdit} />
+      {result.outcome !== "bought" && (
+        <Picked result={result} busy={busy} onAnswer={answer} onEdit={onEdit} onBack={options && (options.options?.length ?? 0) > 1 ? () => setResult(options) : undefined} />
+      )}
       {outcome === "refused" && orderId && (
         <Ask<DontBuyReason>
           question="Why not? (optional)"
@@ -288,7 +321,7 @@ function Ask<T extends string>({ question, options, onPick }: { question: string
   );
 }
 
-function Picked({ result, busy, onAnswer, onEdit }: { result: ShopResult; busy: string | null; onAnswer: (a: "pay" | "dont") => void; onEdit: () => void }) {
+function Picked({ result, busy, onAnswer, onEdit, onBack }: { result: ShopResult; busy: string | null; onAnswer: (a: "pay" | "dont") => void; onEdit: () => void; onBack?: () => void }) {
   const pick = result.pick!;
   const p = pick.product;
   const checks = result.checks ?? [];
@@ -302,7 +335,7 @@ function Picked({ result, busy, onAnswer, onEdit }: { result: ShopResult; busy: 
 
   return (
     <section className="sheet" aria-live="polite" aria-labelledby="pick-title">
-      <span className="step" id="pick-title">2 · It picked</span>
+      <span className="step" id="pick-title">{result.outcome === "ask" ? "One question first" : "Your choice"}</span>
       <div className="product">
         {p.image ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -374,6 +407,7 @@ function Picked({ result, busy, onAnswer, onEdit }: { result: ShopResult; busy: 
               {result.message && <span className="note">{result.message}</span>}
             </span>
           </div>
+          {onBack && <button type="button" className="btn secondary" onClick={onBack}>Choose another option</button>}
           <button type="button" className="link" onClick={onEdit}>Edit request</button>
         </>
       )}
@@ -399,11 +433,23 @@ function Done({ result, onRefund }: { result: ShopResult; onRefund: () => Promis
   const charged = pp?.amount ?? 0;
   return (
     <section className="sheet" aria-labelledby="done-title" aria-live="polite">
-      <span className="step" id="done-title">3 · Done</span>
-      <div>
-        <div className="money">{money(charged)}</div>
-        <p className="sub">{result.refunded ? "Refunded" : "Charged"} · {result.pick?.product.title}</p>
-      </div>
+      <span className="step" id="done-title">{result.refunded ? "Refunded" : "Done"}</span>
+      {result.pick && (
+        <div className="product">
+          {result.pick.product.image ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img className="photo" src={result.pick.product.image} alt={result.pick.product.title} />
+          ) : (
+            <div className="photo" aria-hidden />
+          )}
+          <div className="p-info">
+            <div className="p-title">{result.pick.product.title}</div>
+            <span className="sub">{result.pick.product.store}{result.pick.total_line ? ` · ${result.pick.total_line}` : ""}</span>
+            <div className="money">{money(charged)}</div>
+            <span className="sub">{result.refunded ? "Refunded" : "Charged to PayPal"}</span>
+          </div>
+        </div>
+      )}
       {result.refunded && (
         <div className="flag good" role="status">
           <span className="mark ok" aria-hidden>✓</span>
@@ -476,5 +522,71 @@ function ShelfView({ shelf }: { shelf: Shelf }) {
         );
       })}
     </ul>
+  );
+}
+
+// Step 4: up to three options it checked the same way. The recommendation comes first with the
+// AI's one-sentence reason; the others show their price and checks, written by code. Nothing is
+// held until the shopper taps one, and enforcement still checks the one they choose.
+function Choose({ result, buying, onBuy, onEdit }: { result: ShopResult; buying: string | null; onBuy: (id: string) => void; onEdit: () => void }) {
+  const rec = result.recommended;
+  const options = result.options ?? [];
+  const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+  return (
+    <section className="sheet" aria-live="polite" aria-labelledby="choose-title">
+      <span className="step" id="choose-title">Choose one</span>
+      <p className="title">{options.length === 1 ? "It found one option that fits" : `It found ${options.length} options that fit your rules`}</p>
+      <ul className="options">
+        {options.map((o) => {
+          const isRec = o.product.id === rec?.id;
+          const checked = o.checks.filter((c) => c.verdict === "checked").length;
+          return (
+            <li key={o.product.id} className={isRec ? "option rec" : "option"}>
+              {isRec && <span className="badge">Recommended</span>}
+              <div className="product">
+                {o.product.image ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img className="photo" src={o.product.image} alt={o.product.title} />
+                ) : (
+                  <div className="photo" aria-hidden />
+                )}
+                <div className="p-info">
+                  <div className="p-title">{o.product.title}</div>
+                  {o.product.url ? (
+                    <a className="p-link" href={o.product.url} target="_blank" rel="noreferrer">{o.product.store} ↗</a>
+                  ) : (
+                    <span className="sub">{o.product.store}</span>
+                  )}
+                  <div className="p-price">{o.total_line ?? money(o.total)}</div>
+                </div>
+              </div>
+              {o.checks.length > 0 && (
+                <span className="chips">
+                  {o.checks.map((c, i) => (
+                    <span key={i} className={`chip ${c.verdict === "checked" ? "ok" : c.verdict === "didnt_match" ? "no" : "ask"}`}>
+                      <span className={`mark small ${c.verdict === "checked" ? "ok" : c.verdict === "didnt_match" ? "no" : "ask"}`} aria-hidden>
+                        {c.verdict === "checked" ? "✓" : c.verdict === "didnt_match" ? "✕" : "?"}
+                      </span>
+                      {cap(c.value === "yes" ? c.attr : c.attr === "size" ? `size ${c.value}` : `${c.attr}: ${c.value}`)}
+                      {c.verdict !== "checked" && <span className="sr-only">{c.verdict === "didnt_match" ? " (doesn't match)" : " (couldn't check)"}</span>}
+                    </span>
+                  ))}
+                </span>
+              )}
+              {isRec && rec && <p className="why"><b>Why this one:</b> {rec.reason}{rec.by === "ai" && <span className="ai-tag">AI</span>}</p>}
+              {o.checks.length > 0 && checked < o.checks.length && (
+                <p className="sub">{o.checks.length - checked} of your must-haves couldn&apos;t be confirmed, so it would likely be released.</p>
+              )}
+              <button type="button" className={isRec ? "btn primary" : "btn secondary"} disabled={buying !== null} onClick={() => onBuy(o.product.id)}>
+                {buying === o.product.id ? "PayPal is holding…" : `Choose this · ${money(o.total)}`}
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+      <p className="sub">PayPal holds the money only after you choose, and charges only if every rule checks out.</p>
+      {result.error && <p role="alert" className="alert">{result.error}</p>}
+      <button type="button" className="link" onClick={onEdit}>None of these? Edit request</button>
+    </section>
   );
 }

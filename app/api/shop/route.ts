@@ -1,26 +1,21 @@
-import { createHash } from "node:crypto";
 import { ApprovalError, openApproval, seal } from "@/lib/approval.ts";
 import { checkProduct } from "@/lib/check-product.ts";
-import { decide, type Decision, type Proposal } from "@/lib/enforce.ts";
-import { captureHold, placeHold, readOrder, releaseExpiredHolds, releaseHold } from "@/lib/hold.ts";
-import { ANSWER_MINUTES, trackPending } from "@/lib/pending.ts";
-import { buildProof, sealProof, type PayPalRecord, type ProofEvent } from "@/lib/proof.ts";
-import { PayPalError } from "@/lib/paypal.ts";
+import { releaseExpiredHolds } from "@/lib/hold.ts";
 import { allowRun, visitorKey } from "@/lib/guard.ts";
 import { pick } from "@/lib/pick.ts";
-import { totalLine } from "@/lib/pick-core.ts";
+import { optionView, type Choice } from "@/lib/purchase.ts";
 import { searchProducts } from "@/lib/search.ts";
-import { isNamedItem, searchQuery, shortlist, whyDropped } from "@/lib/shortlist.ts";
+import { searchQuery, shortlist, whyDropped } from "@/lib/shortlist.ts";
 
 // POST { approval } → a stream of lines (NDJSON), so the shopper watches the assistant work:
 //   { type: "step", step, text, count? }   one per stage, as it happens
 //   { type: "result", status, ...body }    the outcome, last
 //
-// search (code) → shortlist (code) → check each listing (AI quotes, code verifies) → pick (AI)
-// → PayPal holds the real total → enforcement (code) decides: charge, release, or ask the shopper.
+// search (code) → shortlist (code) → check each listing (AI quotes, code verifies) → recommend (AI)
+// → the shopper chooses among up to 3 checked options. Nothing is held here: PayPal holds only after
+// they choose (/api/shop/buy, lib/purchase.ts), and enforcement (code) then decides.
 //
-// Stop: if the shopper disconnects before PayPal holds anything, the run ends there. Once a hold
-// exists it always finishes (charge, release or ask), so no hold is left without an answer.
+// Stop: the shopper can stop at any point here; nothing has been held.
 export async function POST(request: Request) {
   await releaseExpiredHolds();
   const body = await request.json().catch(() => ({}));
@@ -99,80 +94,25 @@ export async function POST(request: Request) {
       const c = checked.find((x) => x.product.id === chosen.product.id)!;
       step("pick", "Picked one", undefined, { id: c.product.id });
 
-      const proposal: Proposal = {
-        product: c.product,
+      // 3. Stop here and let the shopper choose: the recommendation first, then up to two runner-ups
+      // that were checked the same way. Nothing is held until they tap one (/api/shop/buy).
+      const ordered = [c, ...checked.filter((x) => x.product.id !== c.product.id)].slice(0, 3);
+      const choice: Choice = {
+        approval: String(body.approval),
         quantity,
-        total: Math.round(c.product.price * quantity * 100) / 100,
-        checks: c.checks,
-        is_substitute: !isNamedItem(m, c.product),
-        final_sale: c.final_sale,
-      };
-      const shown = {
-        ...base,
-        pick: { product: c.product, reason: chosen.reason, by: chosen.by, quantity, total: proposal.total, total_line: totalLine(c.product.price, quantity) },
-        checks: c.checks,
-        policy: c.policy,
+        search_source: search.source,
+        funnel,
         shortlist: checked.map((x) => ({ id: x.product.id, title: x.product.title, price: x.product.price, store: x.product.store })),
+        candidates: ordered.map((x) => ({ product: x.product, checks: x.checks, policy: x.policy, final_sale: x.final_sale })),
+        recommended: { id: c.product.id, reason: chosen.reason, by: chosen.by },
       };
-      // Last point where Stop applies. The "hold" step is announced first: the screen removes Stop when
-      // it sees it, so a Stop that reaches us after this check meets a hold that always gets finished.
-      step("hold", `PayPal is holding $${proposal.total.toFixed(2)}`);
-      if (stopped()) return finish(499, { ...shown, outcome: "stopped" });
-
-      // 3. PayPal holds the real total on the saved account; enforcement decides what happens to it.
-      const key = createHash("sha256").update(`${body.approval}|${c.product.id}`).digest("hex").slice(0, 32);
-      const events: ProofEvent[] = [{ at: approved.approved_at, what: "You approved these instructions with PayPal." }];
-      const note = (what: string) => events.push({ at: new Date().toISOString(), what });
-      const record = (decision: Decision, paypal: PayPalRecord) =>
-        buildProof({
-          mandate: m, approved_at: approved.approved_at, search: { source: search.source, funnel, shortlist: shown.shortlist },
-          product: c.product, quantity, total: proposal.total, reason: chosen.reason, by: chosen.by, checks: c.checks, policy: c.policy,
-          decision, paypal, events,
-        });
-      try {
-        const hold = await placeHold(vaultId, c.product.title, proposal.total, key);
-        note(`PayPal held $${hold.amount.toFixed(2)} for "${c.product.title}".`);
-        const decision = decide(m, proposal, { now: new Date(), held: hold.amount });
-        const paypal = { orderId: hold.orderId, authorizationId: hold.authorizationId, held: hold.amount };
-        const ids: PayPalRecord = { order_id: hold.orderId, authorization_id: hold.authorizationId, held: hold.amount };
-
-        if (decision.action === "capture") {
-          const capture = await captureHold(hold.authorizationId, decision.amount, max);
-          note(`Every check passed, so PayPal took $${capture.amount.toFixed(2)}.`);
-          const status = await readOrder(hold.orderId);
-          const proof = record(decision, { ...ids, capture_id: capture.captureId, captured: capture.amount, status: status.authorization ?? status.order });
-          // The receipt can refund exactly this charge, and nothing else (sealed, like the approval).
-          const refund = seal({ captureId: capture.captureId, orderId: hold.orderId, amount: capture.amount, proof });
-          return finish(200, { ...shown, outcome: "bought", decision, paypal: { ...paypal, ...capture, readBack: status }, proof, proof_seal: sealProof(proof), refund });
-        }
-        if (decision.action === "void") {
-          const released = await releaseHold(hold.authorizationId);
-          note(`PayPal released the hold: ${decision.reasons.map((r) => r.message).join(" ")}`);
-          // Loop 2 (anonymous): which rules released it, at which store, and which requirement couldn't be checked.
-          console.info(`[outcome] ${JSON.stringify({
-            at: new Date().toISOString(), outcome: "released", store: c.product.store,
-            rules: decision.reasons.map((r) => r.rule),
-            unchecked: c.checks.filter((x) => x.verdict !== "checked").map((x) => ({ attr: x.attr, verdict: x.verdict })),
-          })}`);
-          const status = await readOrder(hold.orderId);
-          const proof = record(decision, { ...ids, status: status.authorization ?? released.status });
-          return finish(200, { ...shown, outcome: "released", decision, paypal: { ...paypal, status: released.status, readBack: status }, proof, proof_seal: sealProof(proof) });
-        }
-        // Ask: the hold stays open while the shopper decides. The answer route only accepts this sealed
-        // record, which also carries the proof so far.
-        note(`It asked you first: ${decision.checkins.map((x) => x.message).join(" ")}`);
-        const proof = record(decision, { ...ids, status: hold.status });
-        // The question stays open for ANSWER_MINUTES; after that the hold is released, not left on their money.
-        const expires = trackPending(hold.authorizationId);
-        const pending = seal({ authorizationId: hold.authorizationId, orderId: hold.orderId, amount: proposal.total, limit: max, title: c.product.title, proof, expires_at: expires });
-        return finish(200, { ...shown, outcome: "ask", decision, paypal, pending, answer_minutes: ANSWER_MINUTES });
-      } catch (err) {
-        if (err instanceof PayPalError) {
-          const declined = JSON.stringify(err.body ?? "").includes("INSTRUMENT_DECLINED");
-          return finish(502, { ...shown, error: declined ? "PayPal declined the saved account. Nothing was charged." : `PayPal didn't answer (${err.status}). Nothing was charged.` });
-        }
-        return finish(500, { ...shown, error: (err as Error).message });
-      }
+      return finish(200, {
+        ...base,
+        outcome: "choose",
+        recommended: choice.recommended,
+        options: choice.candidates.map((x) => optionView(x, quantity)),
+        choice: seal(choice),
+      });
     },
   });
 
