@@ -13,7 +13,7 @@ import { LABEL_TEXT, readbackRows } from "./readback.ts";
 import type { FunnelStep } from "./shortlist.ts";
 
 export type ProofEvent = { at: string; what: string };
-export type PayPalRecord = { order_id: string; authorization_id: string; held: number; capture_id?: string; captured?: number; status?: string };
+export type PayPalRecord = { order_id: string; authorization_id: string; held: number; capture_id?: string; captured?: number; refund_id?: string; refunded?: number; status?: string };
 
 export type Proof = {
   record: "shopping-assistant-proof/v1";

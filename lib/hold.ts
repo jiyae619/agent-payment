@@ -1,6 +1,7 @@
 // PayPal steps for one purchase: hold the money for the real item, then take it or release it.
 // Only plain code calls these, after enforcement decides; the AI never reaches them.
 
+import { expiredPending } from "./pending.ts";
 import { authorizationFrom, money, paypal, stepRequestId, vaultedHoldOrderBody, type Json } from "./paypal.ts";
 
 export type Hold = { orderId: string; authorizationId: string; amount: number; status: string };
@@ -50,4 +51,28 @@ export async function releaseHold(authorizationId: string) {
   await paypal("POST", `/v2/payments/authorizations/${authorizationId}/void`, {}, { requestId: stepRequestId(authorizationId, "void") });
   const auth: Json = await paypal("GET", `/v2/payments/authorizations/${authorizationId}`);
   return { status: String(auth.status) };
+}
+
+// Give the money back: a full refund of one charge. Refuses a charge that isn't COMPLETED (already
+// refunded, or still pending); a retried click reuses the request id, so PayPal can't refund twice.
+export async function refundCapture(captureId: string) {
+  const capture: Json = await paypal("GET", `/v2/payments/captures/${captureId}`);
+  if (capture.status !== "COMPLETED") throw new Error(`Refused: this charge is ${capture.status}, so it can't be refunded.`);
+  const refund: Json = await paypal("POST", `/v2/payments/captures/${captureId}/refund`, {}, {
+    requestId: stepRequestId(captureId, "refund"),
+  });
+  return { refundId: String(refund.id), status: String(refund.status), amount: Number(refund.amount?.value ?? capture.amount?.value) };
+}
+
+// Release holds whose "asks you first" question went unanswered (lib/pending.ts). Called at the start
+// of each shopping request, so stale holds don't sit on anyone's money while the server is awake.
+export async function releaseExpiredHolds() {
+  for (const id of expiredPending()) {
+    try {
+      await releaseHold(id);
+      console.info(`[hold] released an unanswered hold after the answer window: ${id}`);
+    } catch (err) {
+      console.error(`[hold] couldn't release unanswered hold ${id}: ${(err as Error).message}`);
+    }
+  }
 }

@@ -9,29 +9,38 @@ const BASE = process.env.PAYPAL_API_BASE ?? "https://api-m.sandbox.paypal.com";
 
 let cached: { token: string; expiresAt: number } | null = null;
 
-async function getAccessToken(): Promise<string> {
-  if (cached && Date.now() < cached.expiresAt) return cached.token;
-
+async function oauth(form: string): Promise<Json> {
   const id = process.env.PAYPAL_CLIENT_ID;
   const secret = process.env.PAYPAL_CLIENT_SECRET;
   if (!id || !secret) {
     throw new Error("Missing PAYPAL_CLIENT_ID or PAYPAL_CLIENT_SECRET in .env.local");
   }
-
   const res = await fetch(`${BASE}/v1/oauth2/token`, {
     method: "POST",
     headers: {
       Authorization: `Basic ${Buffer.from(`${id}:${secret}`).toString("base64")}`,
       "Content-Type": "application/x-www-form-urlencoded",
     },
-    body: "grant_type=client_credentials",
+    body: form,
   });
   const data = await res.json();
   if (!res.ok) throw new PayPalError("oauth2/token", res.status, data);
+  return data;
+}
 
+async function getAccessToken(): Promise<string> {
+  if (cached && Date.now() < cached.expiresAt) return cached.token;
+  const data = await oauth("grant_type=client_credentials");
   // Refresh a minute early; sandbox tokens last 3–8 hours.
   cached = { token: data.access_token, expiresAt: Date.now() + (data.expires_in - 60) * 1000 };
   return cached.token;
+}
+
+// The browser-safe token the official PayPal button (JS SDK v6) needs to save a PayPal account.
+// It is scoped to the SDK and short-lived; the client secret never leaves the server.
+export async function browserClientToken(): Promise<string> {
+  const data = await oauth("grant_type=client_credentials&response_type=client_token");
+  return String(data.access_token);
 }
 
 export class PayPalError extends Error {
@@ -39,7 +48,9 @@ export class PayPalError extends Error {
   status: number;
   body: unknown;
   constructor(path: string, status: number, body: unknown) {
-    super(`PayPal ${path} failed with ${status}`);
+    // debug_id is what PayPal support asks for, so it goes in every error message (and the logs).
+    const debugId = (body as { debug_id?: string } | null)?.debug_id;
+    super(`PayPal ${path} failed with ${status}${debugId ? ` (debug_id ${debugId})` : ""}`);
     this.path = path;
     this.status = status;
     this.body = body;
@@ -129,7 +140,7 @@ export function setupTokenBody(returnUrl: string, cancelUrl: string) {
   return {
     payment_source: {
       paypal: {
-        description: "Let your shopping assistant buy within limits you approve",
+        description: "Shopping Assistant holds a payment for each purchase you approve and charges only within your rules",
         usage_type: "MERCHANT",
         customer_type: "CONSUMER",
         usage_pattern: "IMMEDIATE",
@@ -143,6 +154,18 @@ export function setupTokenBody(returnUrl: string, cancelUrl: string) {
       },
     },
   };
+}
+
+// After the shopper approves on PayPal's own screen, turn the setup token into a saved account.
+// The vault id stays on the server (inside the encrypted approval); the browser gets the email only.
+export async function savedAccountFrom(setupTokenId: string): Promise<{ vaultId: string; email: string | null }> {
+  const token: Json = await paypal(
+    "POST",
+    "/v3/vault/payment-tokens",
+    { payment_source: { token: { id: setupTokenId, type: "SETUP_TOKEN" } } },
+    { requestId: stepRequestId(setupTokenId, "vault-token") },
+  );
+  return { vaultId: String(token.id), email: token.payment_source?.paypal?.email_address ?? null };
 }
 
 export function authorizationFrom(order: Json) {

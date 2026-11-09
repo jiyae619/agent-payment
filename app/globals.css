@@ -98,6 +98,13 @@ textarea.request { width: 100%; box-sizing: border-box; font: 17px/1.45 var(--fo
 .flag { display: flex; gap: 10px; align-items: flex-start; background: var(--ask-bg); border-radius: 10px; padding: 10px 12px; font-size: 15px; }
 .flag .link { margin-left: auto; flex: none; min-height: 0; padding: 0; }
 .flag.bad { background: var(--no-bg); }
+.flag.good { background: var(--ok-bg); }
+.approve { display: grid; gap: 10px; border-top: 1px solid var(--line); padding-top: 14px; }
+.approve-title { font-weight: 700; font-size: 17px; margin: 0; }
+.paypal-approve { display: grid; gap: 6px; }
+.paypal-slot { min-height: 48px; }
+.paypal-slot paypal-button { display: block; width: 100%; }
+.paypal-slot.off { opacity: .45; pointer-events: none; }
 .consent { display: flex; gap: 10px; align-items: flex-start; font-size: 15px; cursor: pointer; }
 .consent input { width: 20px; height: 20px; margin-top: 2px; flex: none; accent-color: var(--ink); }
 .past { display: grid; gap: 8px; border-top: 1px solid var(--line); padding-top: 12px; }

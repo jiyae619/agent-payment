@@ -30,6 +30,9 @@ type ShopResult = {
     readBack?: { order: string; authorization: string | null; capture: { id: string; status: string; amount: number } | null };
   };
   pending?: string;
+  answer_minutes?: number;
+  refund?: string; // sealed receipt that can refund exactly this charge
+  refunded?: { refundId: string; status: string; amount: number };
   proof?: { events: { at: string; what: string }[]; paypal: { order_id: string } };
   proof_seal?: string;
 };
@@ -144,6 +147,19 @@ export default function Shopping({ approval, request, item, onEdit }: { approval
     setBusy(null);
   }
 
+  // Refund the whole charge through PayPal. The server only accepts the sealed receipt for this charge.
+  async function refund() {
+    if (!result?.refund) return;
+    const res = await fetch("/api/refund", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ refund: result.refund }) });
+    const r = await res.json().catch(() => ({ error: "Something went wrong. Nothing changed." }));
+    if (!res.ok) {
+      setResult({ ...result, error: r.error });
+      return;
+    }
+    setResult({ ...result, error: undefined, refunded: r.refund, proof: r.proof, proof_seal: r.proof_seal });
+    if (result.paypal?.orderId) updateEntry(result.paypal.orderId, { refunded: true });
+  }
+
   // Save each finished purchase to the shopper's history (their browser only).
   const outcome = result ? outcomeOf(result) : null;
   const orderId = result?.paypal?.orderId;
@@ -237,7 +253,7 @@ export default function Shopping({ approval, request, item, onEdit }: { approval
           }}
         />
       )}
-      {result.outcome === "bought" && <Done result={result} />}
+      {result.outcome === "bought" && <Done result={result} onRefund={refund} />}
       {result.outcome === "bought" && orderId && (
         <Ask<Rating>
           question="Was this right?"
@@ -335,7 +351,10 @@ function Picked({ result, busy, onAnswer, onEdit }: { result: ShopResult; busy: 
           {result.decision.checkins.map((c, i) => (
             <div key={i} className="flag"><span className="mark ask" aria-hidden>!</span><span>{c.message}</span></div>
           ))}
-          <p className="sub">PayPal is holding {money(result.paypal?.held ?? amount)}. Not charged.</p>
+          <p className="sub">
+            PayPal is holding {money(result.paypal?.held ?? amount)}. Not charged.
+            {result.answer_minutes ? ` Answer within ${result.answer_minutes} minutes, or PayPal releases the hold.` : ""}
+          </p>
           <div className="btns">
             <button type="button" className="btn primary" disabled={busy !== null} onClick={() => onAnswer("pay")}>{busy === "pay" ? "Paying…" : `Pay ${money(result.paypal?.held ?? amount)}`}</button>
             <button type="button" className="btn secondary" disabled={busy !== null} onClick={() => onAnswer("dont")}>{busy === "dont" ? "Releasing…" : "Don't buy"}</button>
@@ -352,6 +371,7 @@ function Picked({ result, busy, onAnswer, onEdit }: { result: ShopResult; busy: 
               {result.decision?.action === "void" && (
                 <span className="note">{result.decision.reasons.map((r) => r.message).join(" ")}</span>
               )}
+              {result.message && <span className="note">{result.message}</span>}
             </span>
           </div>
           <button type="button" className="link" onClick={onEdit}>Edit request</button>
@@ -370,24 +390,45 @@ function Picked({ result, busy, onAnswer, onEdit }: { result: ShopResult; busy: 
   );
 }
 
-function Done({ result }: { result: ShopResult }) {
+function Done({ result, onRefund }: { result: ShopResult; onRefund: () => Promise<void> }) {
   const pp = result.paypal;
   const rb = pp?.readBack;
   const asked = result.decision?.action === "ask";
+  const [confirming, setConfirming] = useState(false);
+  const [refunding, setRefunding] = useState(false);
+  const charged = pp?.amount ?? 0;
   return (
-    <section className="sheet" aria-labelledby="done-title">
+    <section className="sheet" aria-labelledby="done-title" aria-live="polite">
       <span className="step" id="done-title">3 · Done</span>
       <div>
-        <div className="money">{money(pp?.amount ?? 0)}</div>
-        <p className="sub">Charged · {result.pick?.product.title}</p>
+        <div className="money">{money(charged)}</div>
+        <p className="sub">{result.refunded ? "Refunded" : "Charged"} · {result.pick?.product.title}</p>
       </div>
+      {result.refunded && (
+        <div className="flag good" role="status">
+          <span className="mark ok" aria-hidden>✓</span>
+          <span>PayPal returned {money(result.refunded.amount)} to the PayPal that paid.</span>
+        </div>
+      )}
       <ul className="list">
         <li className="li"><span className="mark ok" aria-hidden>✓</span><span className="what">{asked ? "You said yes when it asked" : "Within your limit"}</span></li>
         {(result.checks ?? []).filter((c) => c.verdict === "checked").length > 0 && (
           <li className="li"><span className="mark ok" aria-hidden>✓</span><span className="what">Every check passed</span></li>
         )}
       </ul>
-      <p className="sub">Problem later? Not received or not as described: PayPal Purchase Protection. Not what you wanted: the store&apos;s returns.</p>
+      <p className="sub">Problem later? Not received or not as described: PayPal Purchase Protection may cover eligible purchases. Not what you wanted: the store&apos;s returns, or refund it here.</p>
+      {result.refund && !result.refunded && (
+        confirming ? (
+          <div className="btns">
+            <button type="button" className="btn primary" disabled={refunding} onClick={async () => { setRefunding(true); await onRefund(); setRefunding(false); setConfirming(false); }}>
+              {refunding ? "Refunding…" : `Refund ${money(charged)}`}
+            </button>
+            <button type="button" className="btn secondary" disabled={refunding} onClick={() => setConfirming(false)}>Keep it</button>
+          </div>
+        ) : (
+          <button type="button" className="link" onClick={() => setConfirming(true)}>Refund this purchase</button>
+        )
+      )}
       {result.proof && result.proof_seal && (
         <button type="button" className="btn secondary" onClick={() => saveProof(result.proof, result.proof_seal!, result.proof!.paypal.order_id)}>
           Save as proof
@@ -398,6 +439,7 @@ function Done({ result }: { result: ShopResult }) {
         <dl>
           <dt>PayPal order</dt><dd>{pp?.orderId}</dd>
           {pp?.captureId && (<><dt>Charge</dt><dd>{pp.captureId}</dd></>)}
+          {result.refunded && (<><dt>Refund</dt><dd>{result.refunded.refundId}</dd></>)}
           {rb && (<><dt>PayPal says</dt><dd>{rb.order.toLowerCase()}{rb.capture ? `, ${money(rb.capture.amount)} ${rb.capture.status.toLowerCase()}` : ""}</dd></>)}
         </dl>
         {result.proof && (

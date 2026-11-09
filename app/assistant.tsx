@@ -11,6 +11,7 @@ import { clearHistory, loadHistory } from "@/lib/history.ts";
 import { suggest, type Suggestion } from "@/lib/suggest.ts";
 import { applyFix, findWarnings, type Fix, type Warning } from "@/lib/warnings.ts";
 import AttackDemo from "./attack-demo";
+import PayPalApprove from "./paypal-approve";
 import Shopping from "./shopping";
 
 const STARTERS = [
@@ -35,6 +36,8 @@ export default function Assistant() {
   const [loading, setLoading] = useState(false);
   // Sealed by the server once the shopper approves; shopping sends it back.
   const [approval, setApproval] = useState<string | null>(null);
+  // Whose PayPal pays: "your PayPal (email)" after the PayPal button, or the demo account.
+  const [payer, setPayer] = useState<string | null>(null);
   // Opt-in, off by default: share "before → after" when the shopper rewrites their request.
   const [shareEdit, setShareEdit] = useState(false);
 
@@ -130,11 +133,13 @@ export default function Assistant() {
           mandate={mandate}
           dismissed={dismissed}
           approved={approval !== null}
+          payer={payer}
           onEdit={edit}
           onFix={(w) => w.fix && setMandate(applyFix(mandate, w.fix.action))}
           onApply={(fix) => setMandate(applyFix(mandate, fix))}
           onKeep={(w) => setDismissed((d) => [...d, w.id + w.message])}
-          onApproved={(token, approved) => {
+          onApproved={(token, approved, who) => {
+            setPayer(who);
             setMandate(approved);
             setApproval(token);
           }}
@@ -181,11 +186,12 @@ function Readback(props: {
   mandate: Mandate;
   dismissed: string[];
   approved: boolean;
+  payer: string | null;
   onEdit: () => void;
   onFix: (w: Warning) => void;
   onKeep: (w: Warning) => void;
   onApply: (fix: Fix) => void;
-  onApproved: (token: string, mandate: Mandate) => void;
+  onApproved: (token: string, mandate: Mandate, payer: string) => void;
 }) {
   const { mandate, approved } = props;
   const rows = useMemo(() => readbackRows(mandate), [mandate]);
@@ -197,14 +203,15 @@ function Readback(props: {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function approve() {
+  // vaultSetupToken: from the PayPal button (the shopper's own PayPal). Without it: the demo account.
+  async function approve(vaultSetupToken?: string) {
     setBusy(true);
     setError(null);
     try {
-      const res = await fetch("/api/approve", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mandate }) });
+      const res = await fetch("/api/approve", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mandate, vaultSetupToken }) });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error ?? "Approval didn't go through. Please try again.");
-      props.onApproved(data.approval, data.mandate);
+      props.onApproved(data.approval, data.mandate, data.payer);
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -259,15 +266,23 @@ function Readback(props: {
       )}
 
       {approved ? (
-        <p className="sub">✓ Approved{ends ? ` · ${ends}` : ""}</p>
+        <p className="sub">✓ Approved with {props.payer ?? "PayPal"}{ends ? ` · ${ends}` : ""}</p>
+      ) : max === null ? (
+        <button type="button" className="btn primary" disabled>Add a price limit first</button>
       ) : (
-        <>
-          <button type="button" className="btn primary" onClick={approve} disabled={busy || max === null}>
-            {busy ? "Approving…" : max === null ? "Add a price limit first" : `Approve up to $${max}`}
+        <div className="approve">
+          <p className="approve-title">Approve up to ${max} with PayPal</p>
+          <p className="sub">
+            PayPal asks you to let Shopping Assistant hold a payment for each purchase. It only charges when every rule above
+            checks out, or when you say yes.
+          </p>
+          <PayPalApprove disabled={busy} onSaved={(token) => void approve(token)} />
+          <button type="button" className="link" onClick={() => void approve()} disabled={busy}>
+            {busy ? "Approving…" : "No PayPal sandbox login? Use the demo account"}
           </button>
-          <p className="assure">Paid with PayPal (sandbox demo account). Nothing is charged without your OK.{ends ? ` ${ends}.` : ""}</p>
+          <p className="assure">PayPal sandbox: no real money moves. This demo store stands in for the real shop.{ends ? ` ${ends}.` : ""}</p>
           {error && <p role="alert" className="alert">{error}</p>}
-        </>
+        </div>
       )}
     </section>
   );

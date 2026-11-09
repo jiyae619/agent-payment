@@ -8,7 +8,8 @@ Built for the PayPal AI Hackathon. PayPal sandbox only: nothing real is ever cha
 
 **https://shopping-assistant-z5u2.onrender.com** · interactive system map: [/how-it-works](https://shopping-assistant-z5u2.onrender.com/how-it-works)
 
-- Runs on PayPal sandbox with a saved sandbox demo account, so no sign-in is needed.
+- Runs on PayPal sandbox. Approve with the official PayPal button (JS SDK v6) and your own sandbox PayPal login, or use the saved demo account with no sign-in.
+- After a purchase, the receipt can refund it through PayPal's refund API, and an "asks you first" hold nobody answers is released after 30 minutes.
 - Free Render instance: the first load can take up to a minute if the server was asleep.
 - A spend guard limits AI runs per visitor per hour and per day (`lib/guard.ts`).
 

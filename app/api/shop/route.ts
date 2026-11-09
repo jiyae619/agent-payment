@@ -2,7 +2,8 @@ import { createHash } from "node:crypto";
 import { ApprovalError, openApproval, seal } from "@/lib/approval.ts";
 import { checkProduct } from "@/lib/check-product.ts";
 import { decide, type Decision, type Proposal } from "@/lib/enforce.ts";
-import { captureHold, placeHold, readOrder, releaseHold } from "@/lib/hold.ts";
+import { captureHold, placeHold, readOrder, releaseExpiredHolds, releaseHold } from "@/lib/hold.ts";
+import { ANSWER_MINUTES, trackPending } from "@/lib/pending.ts";
 import { buildProof, sealProof, type PayPalRecord, type ProofEvent } from "@/lib/proof.ts";
 import { PayPalError } from "@/lib/paypal.ts";
 import { allowRun, visitorKey } from "@/lib/guard.ts";
@@ -21,6 +22,7 @@ import { isNamedItem, searchQuery, shortlist, whyDropped } from "@/lib/shortlist
 // Stop: if the shopper disconnects before PayPal holds anything, the run ends there. Once a hold
 // exists it always finishes (charge, release or ask), so no hold is left without an answer.
 export async function POST(request: Request) {
+  await releaseExpiredHolds();
   const body = await request.json().catch(() => ({}));
   let approved;
   try {
@@ -139,7 +141,9 @@ export async function POST(request: Request) {
           note(`Every check passed, so PayPal took $${capture.amount.toFixed(2)}.`);
           const status = await readOrder(hold.orderId);
           const proof = record(decision, { ...ids, capture_id: capture.captureId, captured: capture.amount, status: status.authorization ?? status.order });
-          return finish(200, { ...shown, outcome: "bought", decision, paypal: { ...paypal, ...capture, readBack: status }, proof, proof_seal: sealProof(proof) });
+          // The receipt can refund exactly this charge, and nothing else (sealed, like the approval).
+          const refund = seal({ captureId: capture.captureId, orderId: hold.orderId, amount: capture.amount, proof });
+          return finish(200, { ...shown, outcome: "bought", decision, paypal: { ...paypal, ...capture, readBack: status }, proof, proof_seal: sealProof(proof), refund });
         }
         if (decision.action === "void") {
           const released = await releaseHold(hold.authorizationId);
@@ -158,8 +162,10 @@ export async function POST(request: Request) {
         // record, which also carries the proof so far.
         note(`It asked you first: ${decision.checkins.map((x) => x.message).join(" ")}`);
         const proof = record(decision, { ...ids, status: hold.status });
-        const pending = seal({ authorizationId: hold.authorizationId, orderId: hold.orderId, amount: proposal.total, limit: max, title: c.product.title, proof });
-        return finish(200, { ...shown, outcome: "ask", decision, paypal, pending });
+        // The question stays open for ANSWER_MINUTES; after that the hold is released, not left on their money.
+        const expires = trackPending(hold.authorizationId);
+        const pending = seal({ authorizationId: hold.authorizationId, orderId: hold.orderId, amount: proposal.total, limit: max, title: c.product.title, proof, expires_at: expires });
+        return finish(200, { ...shown, outcome: "ask", decision, paypal, pending, answer_minutes: ANSWER_MINUTES });
       } catch (err) {
         if (err instanceof PayPalError) {
           const declined = JSON.stringify(err.body ?? "").includes("INSTRUMENT_DECLINED");

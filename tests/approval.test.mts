@@ -29,13 +29,22 @@ test("an untouched approval opens with the limits the shopper approved", () => {
   assert.deepEqual(openApproval(sealApproval(approval)), approval);
 });
 
-test("raising the limit after approval is refused", () => {
-  // The browser holds the sealed approval, so a script on the page could try to raise $120 to $5,000.
-  const [payload, mac] = sealApproval(approval).split(".");
-  const data = JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
-  data.mandate.payment.amount_range.max = 5000;
-  const forged = `${Buffer.from(JSON.stringify(data)).toString("base64url")}.${mac}`;
-  assert.throws(() => openApproval(forged), ApprovalError);
+test("changing the approval after it was sealed is refused", () => {
+  // The browser holds the sealed approval, so a script on the page could try to change it.
+  // Flipping any byte of the sealed body (where the $120 limit lives) must break the seal.
+  const [iv, body, tag] = sealApproval(approval).split(".");
+  const bytes = Buffer.from(body, "base64url");
+  bytes[10] ^= 1;
+  assert.throws(() => openApproval(`${iv}.${bytes.toString("base64url")}.${tag}`), ApprovalError);
+});
+
+test("the browser can't read the saved PayPal account inside the approval", () => {
+  // PayPal says to keep a saved account's id on the server. The approval is the only place the
+  // browser holds it, so the seal must hide it, not just sign it.
+  const token = sealApproval(approval);
+  const visible = token.split(".").map((p) => Buffer.from(p, "base64url").toString("latin1")).join(" ");
+  assert.ok(!visible.includes("demo-vault"), "vault id readable in the sealed approval");
+  assert.ok(!visible.includes("120"), "limit readable in the sealed approval");
 });
 
 test("an approval sealed with another secret is refused", () => {

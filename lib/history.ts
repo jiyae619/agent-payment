@@ -19,6 +19,7 @@ export type HistoryEntry = {
   asked_because?: string[]; // check-in rules that fired, e.g. "new_store", "over_amount"
   reason?: DontBuyReason; // why the shopper said Don't buy
   rating?: Rating; // "Was this right?" after a purchase
+  refunded?: boolean; // the shopper refunded it from the receipt
 };
 
 export const REASON_TEXT: Record<DontBuyReason, string> = {
