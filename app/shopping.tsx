@@ -12,6 +12,10 @@ import { RATING_TEXT, REASON_TEXT, recordEntry, updateEntry, type DontBuyReason,
 import type { FunnelStep } from "@/lib/shortlist.ts";
 
 type Step = { step: string; text: string; count?: number };
+// The live shelf: what the agent found, and what happened to each item as it shopped.
+type ShelfItem = { id: string; title: string; price: number; store: string; image: string | null };
+type Shelf = { items: ShelfItem[]; kept?: string[]; dropped?: Record<string, string>; checked: Record<string, { ok: number; of: number }>; picked?: string };
+const NO_SHELF: Shelf = { items: [], checked: {} };
 type ShopResult = {
   outcome?: "bought" | "released" | "ask" | "nothing_found" | "stopped";
   message?: string;
@@ -69,6 +73,7 @@ function sendFeedback(kind: "dont_buy_reason" | "rating", value: string, r: Shop
 
 export default function Shopping({ approval, request, item, onEdit }: { approval: string; request: string; item: string; onEdit: () => void }) {
   const [steps, setSteps] = useState<Step[]>([]);
+  const [shelf, setShelf] = useState<Shelf>(NO_SHELF);
   const [result, setResult] = useState<ShopResult | null>(null);
   const [running, setRunning] = useState(false);
   const [busy, setBusy] = useState<"pay" | "dont" | null>(null);
@@ -79,6 +84,7 @@ export default function Shopping({ approval, request, item, onEdit }: { approval
     const ctrl = new AbortController();
     controller.current = ctrl;
     setSteps([]);
+    setShelf(NO_SHELF);
     setResult(null);
     setRunning(true);
     let held = false;
@@ -104,6 +110,11 @@ export default function Shopping({ approval, request, item, onEdit }: { approval
           if (event.type === "step") {
             if (event.step === "hold") held = true;
             setSteps((s) => [...s, event]);
+            if (event.items) setShelf((sh) => ({ ...sh, items: event.items }));
+            if (event.kept) setShelf((sh) => ({ ...sh, kept: event.kept, dropped: event.dropped }));
+            if (event.step === "pick") setShelf((sh) => ({ ...sh, picked: event.id }));
+          } else if (event.type === "item") {
+            setShelf((sh) => ({ ...sh, checked: { ...sh.checked, [event.id]: { ok: event.ok, of: event.of } } }));
           } else if (event.type === "result") {
             setResult(event);
           }
@@ -172,6 +183,7 @@ export default function Shopping({ approval, request, item, onEdit }: { approval
             );
           })}
         </ol>
+        {shelf.items.length > 0 && <ShelfView shelf={shelf} />}
         <p className="sub">{held ? "PayPal is holding the money. Not charged yet." : "Nothing is held yet."}</p>
         {!held && (
           <button type="button" className="btn secondary" onClick={() => controller.current?.abort()}>Stop</button>
@@ -393,5 +405,34 @@ function Done({ result }: { result: ShopResult }) {
         )}
       </details>
     </section>
+  );
+}
+
+// Watching it shop: every product it found, dimmed with the rule that removed it, then checked,
+// then the one it picked. Plain data from the server; no AI text here.
+function ShelfView({ shelf }: { shelf: Shelf }) {
+  const order = (id: string) => (shelf.picked === id ? 0 : shelf.kept?.includes(id) ? 1 : shelf.dropped?.[id] ? 3 : 2);
+  const items = [...shelf.items].sort((a, b) => order(a.id) - order(b.id));
+  return (
+    <ul className="shelf" aria-label="What it found">
+      {items.map((p) => {
+        const reason = shelf.dropped?.[p.id];
+        const kept = shelf.kept?.includes(p.id);
+        const check = shelf.checked[p.id];
+        const picked = shelf.picked === p.id;
+        const state = picked ? "picked" : reason ? "dropped" : kept ? "kept" : "found";
+        return (
+          <li key={p.id} className={`tile ${state}`}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            {p.image ? <img src={p.image} alt="" className="tile-img" loading="lazy" /> : <span className="tile-img" aria-hidden />}
+            <span className="tile-title">{p.title}</span>
+            <span className="tile-meta">{money(p.price)} · {p.store}</span>
+            <span className="tile-status">
+              {picked ? "Picked" : reason ? reason : check ? (check.of ? `${check.ok} of ${check.of} confirmed` : "Listing read") : kept ? "Reading listing…" : ""}
+            </span>
+          </li>
+        );
+      })}
+    </ul>
   );
 }

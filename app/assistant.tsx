@@ -3,6 +3,7 @@
 // Step 1 of the Checkout Sheet: what you asked → what it will do. The shopper's words appear once;
 // every line below is a fixed template (lib/readback.ts), never AI-written text.
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import type { Mandate } from "@/lib/mandate.ts";
 import { readbackRows, type Label } from "@/lib/readback.ts";
@@ -13,8 +14,8 @@ import AttackDemo from "./attack-demo";
 import Shopping from "./shopping";
 
 const STARTERS = [
-  { label: "Running shoes", text: "Waterproof running shoes, size 8, under $120. Free returns please. Ask me if it's over $100." },
-  { label: "Dish soap", text: "3 bottles of dish soap, under $50 for all of them. Any store is fine." },
+  { label: "Running shoes", watch: "Strict rules: size, free returns, asks above $100", text: "Waterproof running shoes, size 8, under $120. Free returns please. Ask me if it's over $100." },
+  { label: "Dish soap", watch: "Buys 3; your limit covers the total", text: "3 bottles of dish soap, under $50 for all of them. Any store is fine." },
 ];
 
 export const MARK: Record<Label, { cls: string; sym: string; name: string }> = {
@@ -67,10 +68,24 @@ export default function Assistant() {
 
   return (
     <main className="page">
-      <div className="brand">
+      <header className="brand">
         <h1>Shopping Assistant</h1>
-        <span>Sandbox demo</span>
-      </div>
+        <nav className="brand-nav">
+          <Link href="/how-it-works">How it works</Link>
+          <span className="chip-sandbox">Sandbox</span>
+        </nav>
+      </header>
+
+      {!mandate && (
+        <section className="hero" aria-labelledby="hero-title">
+          <h2 id="hero-title">An AI shops for you. PayPal pays only if your rules hold.</h2>
+          <ol className="hero-steps">
+            <li><span><b>Say it</b> in your own words</span></li>
+            <li><span><b>Approve</b> the exact rules, not just a total</span></li>
+            <li><span><b>It shops.</b> PayPal holds the money until every rule checks out</span></li>
+          </ol>
+        </section>
+      )}
 
       {editing || !mandate ? (
         <section className="sheet" aria-labelledby="ask-title">
@@ -84,10 +99,17 @@ export default function Assistant() {
             onChange={(e) => setText(e.target.value)}
             placeholder="Running shoes, size 8, under $120. Ask me if it's over $100."
           />
-          <div className="starters">
+          <div className="try" role="group" aria-label="Try one">
             {STARTERS.map((s) => (
-              <button key={s.label} type="button" className="starter" onClick={() => setText(s.text)}>{s.label}</button>
+              <button key={s.label} type="button" className="try-card" aria-pressed={text === s.text} onClick={() => setText(s.text)}>
+                <b>{s.label}</b>
+                <span>{s.watch}</span>
+              </button>
             ))}
+            <a className="try-card" href="#attack">
+              <b>Gift-card trap</b>
+              <span>A web page tells the agent to buy a gift card</span>
+            </a>
           </div>
           <button type="button" className="btn primary" onClick={readBack} disabled={loading || !text.trim()}>
             {loading ? "Reading your request…" : "Show me what it will do"}

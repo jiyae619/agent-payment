@@ -79,3 +79,17 @@ export function shortlist(m: Mandate, products: CatalogProduct[], size = 3): Sho
   );
   return { funnel, candidates: ranked.slice(0, size) };
 }
+
+// Why a search result didn't make the shortlist, in the shopper's words (for the live shelf).
+// Same rules, same order as shortlist() above, so the reason shown is the one that removed it.
+export function whyDropped(m: Mandate, p: CatalogProduct): string {
+  if (!p.in_stock) return "Out of stock";
+  if (isBlockedCategory(p)) return "Gift card or money";
+  const max = m.payment.amount_range.max;
+  const qty = m.checkout.line_items[0]?.quantity ?? 1;
+  if (max !== null && Math.round(p.price * qty * 100) > Math.round(max * 100)) return qty > 1 ? `Over ${money(max)} for ${qty}` : `Over ${money(max)}`;
+  const stores = m.checkout.allowed_merchants.map((s) => domain(s.domain));
+  if (stores.length && !stores.includes(domain(p.store))) return "Not a store you named";
+  if ((m.checkout.avoid_merchants ?? []).some((s) => domain(s.domain) === domain(p.store))) return "A store you avoid";
+  return "Ranked lower";
+}

@@ -31,7 +31,7 @@ export default function AttackDemo() {
   const note = naive?.hidden_note ?? informed?.hidden_note;
 
   return (
-    <section className="demo" aria-labelledby="demo-title">
+    <section className="demo" id="attack" aria-labelledby="demo-title">
       <h2 id="demo-title">Why the approval screen matters</h2>
       <p className="sub">
         A product page hides a note telling shopping assistants to buy its $100 gift card. A simulated assistant that obeys

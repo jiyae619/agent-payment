@@ -9,7 +9,7 @@ import { allowRun, visitorKey } from "@/lib/guard.ts";
 import { pick } from "@/lib/pick.ts";
 import { totalLine } from "@/lib/pick-core.ts";
 import { searchProducts } from "@/lib/search.ts";
-import { isNamedItem, searchQuery, shortlist } from "@/lib/shortlist.ts";
+import { isNamedItem, searchQuery, shortlist, whyDropped } from "@/lib/shortlist.ts";
 
 // POST { approval } → a stream of lines (NDJSON), so the shopper watches the assistant work:
 //   { type: "step", step, text, count? }   one per stage, as it happens
@@ -46,7 +46,7 @@ export async function POST(request: Request) {
           // the shopper left; nothing to tell
         }
       };
-      const step = (step: string, text: string, count?: number) => send({ type: "step", step, text, count });
+      const step = (step: string, text: string, count?: number, extra: object = {}) => send({ type: "step", step, text, count, ...extra });
       const finish = (status: number, result: object) => {
         send({ type: "result", status, ...result });
         controller.close();
@@ -60,8 +60,12 @@ export async function POST(request: Request) {
       // 1. Search and shortlist: plain code.
       const search = await searchProducts(searchQuery(m), { maxPrice: max, limit: 8 });
       const { funnel, candidates } = shortlist(m, search.products);
-      step("search", "Searched stores", funnel[0]?.count);
-      step("filter", `Kept what fits your limits`, candidates.length);
+      // The live shelf: what it found, then what each of your rules removed.
+      const items = search.products.map((p) => ({ id: p.id, title: p.title, price: p.price, store: p.store, image: p.image }));
+      step("search", "Searched stores", funnel[0]?.count, { items });
+      const kept = candidates.map((p) => p.id);
+      const dropped = Object.fromEntries(search.products.filter((p) => !kept.includes(p.id)).map((p) => [p.id, whyDropped(m, p)]));
+      step("filter", `Kept what fits your limits`, candidates.length, { kept, dropped });
       const base = { funnel, search_source: search.source };
       if (stopped()) return finish(499, { ...base, outcome: "stopped" });
       if (candidates.length === 0) return finish(200, { ...base, outcome: "nothing_found", message: "Nothing matched your limits, so nothing was held or bought." });
@@ -71,7 +75,12 @@ export async function POST(request: Request) {
       const reqs = [...m.ext.must_haves, ...m.ext.conditions_of_sale];
       let checked;
       try {
-        checked = await Promise.all(candidates.map(async (product) => ({ product, ...(await checkProduct(product, reqs)) })));
+        checked = await Promise.all(candidates.map(async (product) => {
+          const r = await checkProduct(product, reqs);
+          const ok = r.checks.filter((x) => x.verdict === "checked").length;
+          send({ type: "item", id: product.id, ok, of: r.checks.length });
+          return { product, ...r };
+        }));
       } catch {
         return finish(502, { ...base, error: "The AI couldn't check the products right now. Nothing was held or bought." });
       }
@@ -86,7 +95,7 @@ export async function POST(request: Request) {
       }
       if (!chosen) return finish(200, { ...base, outcome: "nothing_found", message: "Nothing matched your limits." });
       const c = checked.find((x) => x.product.id === chosen.product.id)!;
-      step("pick", "Picked one");
+      step("pick", "Picked one", undefined, { id: c.product.id });
 
       const proposal: Proposal = {
         product: c.product,

@@ -6,7 +6,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { GIFT_CARD, type CatalogProduct } from "../lib/catalog.ts";
 import type { Mandate } from "../lib/mandate.ts";
-import { isNamedItem, mentions, searchQuery, shortlist } from "../lib/shortlist.ts";
+import { isNamedItem, mentions, searchQuery, shortlist, whyDropped } from "../lib/shortlist.ts";
 
 function mandate(over: (m: Mandate) => void = () => {}): Mandate {
   const m: Mandate = {
@@ -102,4 +102,17 @@ test("a similar item is not the named item, so the substitute check-in can ask",
 
 test("the search asks for the named item plus its yes/no must-haves", () => {
   assert.equal(searchQuery(mandate()), "running shoes waterproof");
+});
+
+// The live shelf tells the shopper why each product was left out. The reason must be the rule that
+// actually removed it, or the screen would explain the shortlist wrongly.
+test("each dropped product shows the rule that removed it", () => {
+  const m = mandate();
+  assert.equal(whyDropped(m, GIFT_CARD), "Gift card or money");
+  assert.equal(whyDropped(m, shoe({ id: "x", price: 150 })), "Over $120");
+  assert.equal(whyDropped(m, shoe({ id: "y", price: 50, store: "amazon.com" })), "Not a store you named");
+  assert.equal(whyDropped(m, shoe({ id: "z", price: 50, in_stock: false })), "Out of stock");
+  const three = mandate((x) => { x.checkout.line_items[0].quantity = 3; });
+  assert.equal(whyDropped(three, shoe({ id: "q", price: 45 })), "Over $120 for 3", "the limit covers price × quantity");
+  assert.equal(whyDropped(m, shoe({ id: "ok", price: 50 })), "Ranked lower");
 });
