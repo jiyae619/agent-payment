@@ -40,7 +40,11 @@ export function searchQuery(m: Mandate): string {
   const named = m.checkout.line_items.map((l) => l.description).join(" ");
   if (!named) return m.source_text;
   const extras = m.ext.must_haves.map((h) => (h.value === "yes" ? h.attr : h.attr === "brand" ? h.value : "")).filter(Boolean);
-  return [named, ...extras].join(" ");
+  // "waterproof running shoes" + waterproof and "running shoes" + waterproof are the same request, so
+  // they must search the same way: must-have words come off the item name and go after it, once.
+  const extra = new Set(extras.flatMap((e) => e.toLowerCase().split(/\s+/)));
+  const item = named.split(/\s+/).filter((w) => !extra.has(w.toLowerCase())).join(" ");
+  return [item, ...extras].filter(Boolean).join(" ");
 }
 
 const known = (p: CatalogProduct) => findPolicy(p.store, "returns") !== null;

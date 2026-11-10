@@ -104,6 +104,13 @@ test("the search asks for the named item plus its yes/no must-haves", () => {
   assert.equal(searchQuery(mandate()), "running shoes waterproof");
 });
 
+test("the same request searches the same way however the AI names the item", () => {
+  // The drafter sometimes keeps "waterproof" in the item name; the search (and so the options) must not change.
+  const m = mandate();
+  const named = { ...m, checkout: { ...m.checkout, line_items: [{ ...m.checkout.line_items[0], description: "waterproof running shoes" }] } };
+  assert.equal(searchQuery(named), searchQuery(m));
+});
+
 // The live shelf tells the shopper why each product was left out. The reason must be the rule that
 // actually removed it, or the screen would explain the shortlist wrongly.
 test("each dropped product shows the rule that removed it", () => {
