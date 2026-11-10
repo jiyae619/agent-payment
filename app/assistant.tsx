@@ -100,6 +100,7 @@ export default function Assistant() {
       <header className="brand">
         <h1>Shopping Assistant</h1>
         <nav className="brand-nav">
+          <Link href="/purchases">Your purchases</Link>
           <Link href="/how-it-works">How it works</Link>
           <span className="chip-sandbox">Sandbox</span>
         </nav>
@@ -110,7 +111,7 @@ export default function Assistant() {
       {stage === 0 && !mandate && (
         <section className="hero" aria-labelledby="hero-title">
           <h2 id="hero-title">An AI shops for you. PayPal pays only if your rules hold.</h2>
-          <p className="sub">See how it reads your words, watch what it looks at, choose what it found, and only then does PayPal hold the money.</p>
+          <p className="sub">It shows you how it read your request and what it looked at. You pick from what it found, and PayPal holds money only after that.</p>
         </section>
       )}
 
@@ -149,7 +150,7 @@ export default function Assistant() {
                 </label>
               ))}
             </div>
-            <p className="note">Every level asks you first before anything that can&apos;t be undone.</p>
+            <p className="note">Every level asks before it buys anything that can&apos;t be undone.</p>
           </fieldset>
           <button type="button" className="btn primary" onClick={readBack} disabled={loading || !text.trim()}>
             {loading ? "Reading your request…" : "Show me what it will do"}
@@ -345,16 +346,14 @@ function Readback(props: {
         <div className="approve">
           <p className="approve-title">Approve up to ${max} with PayPal</p>
           <p className="sub">
-            PayPal asks you to let Shopping Assistant hold a payment for each purchase. It only charges when every rule above
-            checks out, or when you say yes.
+            Sign in to a PayPal sandbox account and agree to let Shopping Assistant hold a payment for each purchase. It only
+            charges when every rule checks out, or when you say yes.
           </p>
           {unconfirmed > 0 && <p className="sub">Confirm {unconfirmed === 1 ? "the guess" : `the ${unconfirmed} guesses`} above to approve.</p>}
           <PayPalApprove disabled={busy || unconfirmed > 0} onSaved={(token) => void approve(token)} />
-          <p className="or-line"><span>or</span></p>
-          <button type="button" className="btn secondary" onClick={() => void approve()} disabled={busy || unconfirmed > 0}>
-            {busy ? "Approving…" : "Try with the demo account"}
+          <button type="button" className="link small" onClick={() => void approve()} disabled={busy || unconfirmed > 0}>
+            {busy ? "Approving…" : "Can't sign in to the PayPal sandbox? Use the saved test account"}
           </button>
-          <p className="approved-line">No PayPal sandbox login needed. It uses a sandbox PayPal account that&apos;s already saved.</p>
           <p className="assure">PayPal sandbox: no real money moves. This demo store stands in for the real shop.{ends ? ` ${ends}.` : ""}</p>
           {error && <p role="alert" className="alert">{error}</p>}
         </div>

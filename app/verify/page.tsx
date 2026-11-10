@@ -19,7 +19,7 @@ export default function VerifyPage() {
       </header>
       <section className="hero">
         <h2>Was this purchase made within the shopper&apos;s rules?</h2>
-        <p className="sub">For stores and PayPal. Open the shopper&apos;s saved proof file. It shows what they approved, what was checked, and how the money moved. Their own words stay private.</p>
+        <p className="sub">For stores and PayPal. Open the shopper&apos;s saved proof file. It shows what they approved, what was checked and how the money moved. Their own request isn&apos;t in the file.</p>
       </section>
       <Verify />
     </main>

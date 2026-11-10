@@ -20,6 +20,7 @@ export async function POST(request: Request) {
     const status = await readOrder(r.orderId);
     const proof: Proof = {
       ...r.proof,
+      outcome: { status: "refunded", amount: 0 },
       paypal: { ...r.proof.paypal, refund_id: refund.refundId, refunded: refund.amount, status: status.capture?.status ?? r.proof.paypal.status },
       events: [...r.proof.events, { at: new Date().toISOString(), what: `You asked for a refund, so PayPal returned $${refund.amount.toFixed(2)}.` }],
     };

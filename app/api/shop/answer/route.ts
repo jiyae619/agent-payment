@@ -27,6 +27,7 @@ export async function POST(request: Request) {
       const proof: Proof = {
         ...p.proof,
         paypal: { ...p.proof.paypal, capture_id: capture.captureId, captured: capture.amount, status: status.authorization ?? status.order },
+        outcome: { status: "charged", amount: capture.amount },
         who_covers: whoCovers(true, p.proof.return_policy !== null),
         events: [...p.proof.events, { at: now(), what: `You said pay, so PayPal took $${capture.amount.toFixed(2)}.` }],
       };
@@ -40,6 +41,7 @@ export async function POST(request: Request) {
       const proof: Proof = {
         ...p.proof,
         paypal: { ...p.proof.paypal, status: status.authorization ?? released.status },
+        outcome: { status: "released", amount: 0 },
         who_covers: whoCovers(false, p.proof.return_policy !== null),
         events: [...p.proof.events, { at: now(), what: late ? "The question went unanswered, so PayPal released the hold." : "You said don't buy, so PayPal released the hold." }],
       };

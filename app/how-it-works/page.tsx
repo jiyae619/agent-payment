@@ -18,7 +18,7 @@ export default function HowItWorks() {
         </nav>
       </header>
       <section className="hero">
-        <h2>The AI recommends and explains. You choose. Code decides whether PayPal may charge.</h2>
+        <h2>The AI suggests and explains. You choose, and plain code decides whether PayPal can charge.</h2>
         <p className="sub">Four runs, one for each way a purchase can end: it buys, it asks you, it stops itself, or it blocks an attack. Pick one and press Play to follow it through the system, or tap any box.</p>
       </section>
       <Diagram />

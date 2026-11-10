@@ -4,6 +4,7 @@
 // three checked options, then PayPal holds and code decides (charge, release, or ask you). The
 // "why" sentence is the only AI-written text on these screens, and it is tagged as such.
 
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import type { CatalogProduct } from "@/lib/catalog.ts";
 import type { CheckResult, Decision } from "@/lib/enforce.ts";
@@ -52,7 +53,7 @@ const STAGES: Step[] = [
 const money = (n: number) => `$${Number.isInteger(n) ? n : n.toFixed(2)}`;
 
 // Save as proof: the sealed record as a file the shopper keeps.
-function saveProof(proof: unknown, seal: string, orderId: string) {
+export function saveProof(proof: unknown, seal: string, orderId: string) {
   const blob = new Blob([JSON.stringify({ proof, seal, check_at: "/verify" }, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -79,7 +80,7 @@ function sendFeedback(kind: "dont_buy_reason" | "rating", value: string, r: Shop
 }
 
 // Which step of the flow this screen is: 2 shopping, 3 choosing, 4 paying (and the result).
-export type ShopStage = 2 | 3 | 4;
+export type ShopStage = 2 | 3 | 4 | 5; // 5 = finished, every step done
 
 export default function Shopping({ approval, request, item, onEdit, onStage }: { approval: string; request: string; item: string; onEdit: () => void; onStage: (s: ShopStage) => void }) {
   const [steps, setSteps] = useState<Step[]>([]);
@@ -163,7 +164,7 @@ export default function Shopping({ approval, request, item, onEdit, onStage }: {
   }
 
   // Tell the page which step this is, for the stepper at the top.
-  const stage: ShopStage = running || !result || result.outcome === "stopped" ? 2 : result.outcome === "choose" ? 3 : result.outcome === "nothing_found" ? 2 : 4;
+  const stage: ShopStage = running || !result || result.outcome === "stopped" ? 2 : result.outcome === "choose" ? 3 : result.outcome === "nothing_found" ? 2 : result.outcome === "bought" || (result.outcome === "released" && !result.pending) ? 5 : 4;
   useEffect(() => {
     onStage(stage);
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -176,19 +177,6 @@ export default function Shopping({ approval, request, item, onEdit, onStage }: {
     const r = await res.json().catch(() => ({ error: "Something went wrong. Nothing changed." }));
     setResult({ ...result, ...r, paypal: { ...result.paypal, ...r.paypal }, pending: r.error ? result.pending : undefined, outcome: r.outcome ?? result.outcome });
     setBusy(null);
-  }
-
-  // Refund the whole charge through PayPal. The server only accepts the sealed receipt for this charge.
-  async function refund() {
-    if (!result?.refund) return;
-    const res = await fetch("/api/refund", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ refund: result.refund }) });
-    const r = await res.json().catch(() => ({ error: "Something went wrong. Nothing changed." }));
-    if (!res.ok) {
-      setResult({ ...result, error: r.error });
-      return;
-    }
-    setResult({ ...result, error: undefined, refunded: r.refund, proof: r.proof, proof_seal: r.proof_seal });
-    if (result.paypal?.orderId) updateEntry(result.paypal.orderId, { refunded: true });
   }
 
   // Save each finished purchase to the shopper's history (their browser only).
@@ -206,6 +194,8 @@ export default function Shopping({ approval, request, item, onEdit, onStage }: {
       amount: result.pick.total ?? result.pick.product.price,
       outcome,
       asked_because: result.decision?.action === "ask" ? result.decision.checkins.map((c) => c.rule) : undefined,
+      // Refunds happen later, from Your purchases, so the sealed refund token and proof go with the entry.
+      ...(outcome === "bought" ? { refund: result.refund, proof: result.proof, proof_seal: result.proof_seal } : {}),
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderId, outcome]);
@@ -287,7 +277,7 @@ export default function Shopping({ approval, request, item, onEdit, onStage }: {
           }}
         />
       )}
-      {result.outcome === "bought" && <Done result={result} onRefund={refund} />}
+      {result.outcome === "bought" && <Done result={result} />}
       {result.outcome === "bought" && orderId && (
         <Ask<Rating>
           question="Was this right?"
@@ -425,12 +415,10 @@ function Picked({ result, busy, onAnswer, onEdit, onBack }: { result: ShopResult
   );
 }
 
-function Done({ result, onRefund }: { result: ShopResult; onRefund: () => Promise<void> }) {
+function Done({ result }: { result: ShopResult }) {
   const pp = result.paypal;
   const rb = pp?.readBack;
   const asked = result.decision?.action === "ask";
-  const [confirming, setConfirming] = useState(false);
-  const [refunding, setRefunding] = useState(false);
   const charged = pp?.amount ?? 0;
   return (
     <section className="sheet" aria-labelledby="done-title" aria-live="polite">
@@ -463,26 +451,17 @@ function Done({ result, onRefund }: { result: ShopResult; onRefund: () => Promis
           <li className="li"><span className="mark ok" aria-hidden>✓</span><span className="what">Every check passed</span></li>
         )}
       </ul>
-      <p className="sub">Problem later? Not received or not as described: PayPal Purchase Protection may cover eligible purchases. Not what you wanted: the store&apos;s returns, or refund it here.</p>
-      {result.refund && !result.refunded && (
-        confirming ? (
-          <div className="btns">
-            <button type="button" className="btn primary" disabled={refunding} onClick={async () => { setRefunding(true); await onRefund(); setRefunding(false); setConfirming(false); }}>
-              {refunding ? "Refunding…" : `Refund ${money(charged)}`}
-            </button>
-            <button type="button" className="btn secondary" disabled={refunding} onClick={() => setConfirming(false)}>Keep it</button>
-          </div>
-        ) : (
-          <button type="button" className="link" onClick={() => setConfirming(true)}>Refund this purchase</button>
-        )
-      )}
+      <p className="sub">
+        Problem later? If it doesn&apos;t arrive or isn&apos;t as described, PayPal Purchase Protection may cover it. If you change your mind,
+        refund it from <Link href="/purchases">Your purchases</Link>.
+      </p>
       {result.proof && result.proof_seal && (
         <button type="button" className="btn secondary" onClick={() => saveProof(result.proof, result.proof_seal!, result.proof!.paypal.order_id)}>
           Save as proof
         </button>
       )}
       {result.proof && result.proof_seal && (
-        <p className="note">A store or PayPal can check the saved file at <a href="/verify" target="_blank" rel="noreferrer">/verify</a>. Your own words stay private.</p>
+        <p className="note">A store or PayPal can check the saved file at <a href="/verify" target="_blank" rel="noreferrer">/verify</a>. The file doesn&apos;t include your own words.</p>
       )}
       <details className="more">
         <summary>Details</summary>

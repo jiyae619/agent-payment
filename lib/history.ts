@@ -19,7 +19,10 @@ export type HistoryEntry = {
   asked_because?: string[]; // check-in rules that fired, e.g. "new_store", "over_amount"
   reason?: DontBuyReason; // why the shopper said Don't buy
   rating?: Rating; // "Was this right?" after a purchase
-  refunded?: boolean; // the shopper refunded it from the receipt
+  refunded?: boolean; // the shopper refunded it from Your purchases
+  refund?: string; // sealed token that can refund exactly this charge (server-made, encrypted)
+  proof?: unknown; // the sealed proof record, so it can be saved again later
+  proof_seal?: string;
 };
 
 export const REASON_TEXT: Record<DontBuyReason, string> = {

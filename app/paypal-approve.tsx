@@ -75,7 +75,7 @@ export default function PayPalApprove({ disabled, onSaved }: { disabled: boolean
             saved.current(d.vaultSetupToken);
           },
           onCancel: () => setNote("You closed PayPal. Nothing was saved or charged."),
-          onError: () => setNote("PayPal had a problem. Nothing was charged. Try again, or use the demo account."),
+          onError: () => setNote("PayPal had a problem. Nothing was charged. Try again, or use the saved test account below."),
         });
         // Same element and style as PayPal's v6 save-payment sample.
         button = document.createElement("paypal-button");
@@ -84,7 +84,7 @@ export default function PayPalApprove({ disabled, onSaved }: { disabled: boolean
           setNote(null);
           // Pass the promise itself, not awaited: PayPal opens its window in the same click.
           session.start({ presentationMode: "auto" }, createSetupToken()).catch(() => {
-            setNote("PayPal had a problem. Nothing was charged. Try again, or use the demo account.");
+            setNote("PayPal had a problem. Nothing was charged. Try again, or use the saved test account below.");
           });
         });
         slot.current?.appendChild(button);
@@ -103,7 +103,7 @@ export default function PayPalApprove({ disabled, onSaved }: { disabled: boolean
     <div className="paypal-approve">
       <div ref={slot} className={disabled ? "paypal-slot off" : "paypal-slot"} aria-busy={state === "loading"} />
       {state === "loading" && <p className="sub">Loading PayPal…</p>}
-      {state === "unavailable" && <p className="sub">The PayPal button isn&apos;t available right now. You can use the demo account below.</p>}
+      {state === "unavailable" && <p className="sub">The PayPal button isn&apos;t available right now. You can use the saved test account below.</p>}
       {note && <p role="status" className="sub">{note}</p>}
     </div>
   );

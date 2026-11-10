@@ -8,8 +8,8 @@ Built for the PayPal AI Hackathon. PayPal sandbox only: nothing real is ever cha
 
 **https://shopping-assistant-z5u2.onrender.com** · interactive system map: [/how-it-works](https://shopping-assistant-z5u2.onrender.com/how-it-works)
 
-- Runs on PayPal sandbox. Approve with the official PayPal button (JS SDK v6) and a sandbox PayPal login, or tap **Try with the demo account** to skip sign-in. Judges: sandbox login details are in the Devpost testing instructions.
-- After a purchase, the receipt can refund it through PayPal's refund API, and an "asks you first" hold nobody answers is released after 30 minutes.
+- Runs on PayPal sandbox. Approve with the official PayPal button (JS SDK v6) and a sandbox PayPal login. Judges: the sandbox login is in the Devpost testing instructions. If the PayPal sign-in won't open, a small link uses a saved sandbox test account instead.
+- Refunds live in **Your purchases** (`/purchases`), the order list kept in the shopper's browser, not on the confirmation screen. An "asks you first" hold nobody answers is released after 30 minutes.
 - Free Render instance: the first load can take up to a minute if the server was asleep.
 - A spend guard limits AI runs per visitor per hour and per day (`lib/guard.ts`).
 
@@ -39,7 +39,7 @@ The app runs one step per screen: **Ask → Approve → Shop → Choose → Pay*
 | 12 | Shopper chooses one (picking another option is recorded as the shopper's choice in the proof) | Shopper | `app/shopping.tsx`, `app/api/shop/buy/route.ts` |
 | 13 | PayPal Orders v2 `AUTHORIZE` on the saved (vaulted) account, for the chosen item and total | Code | `lib/purchase.ts`, `lib/hold.ts`, `lib/paypal.ts` |
 | 14 | Enforcement decides: capture, void, or ask the shopper first | Code (pure function, no AI, no network) | `lib/enforce.ts` |
-| 15 | Receipt read back from PayPal, plus a sealed proof record the shopper can keep; Refund on the receipt | Code | `lib/hold.ts` (`readOrder`, `refundCapture`), `lib/proof.ts` |
+| 15 | Receipt read back from PayPal, plus a sealed proof record the shopper can keep (no shopper words in it, only a fingerprint); refunds from Your purchases | Code | `lib/hold.ts` (`readOrder`, `refundCapture`), `lib/proof.ts` |
 
 Enforcement order: hard limits first (amount, stores, quantity, expiry, gift cards, exact item), then the checker's results, then check-ins (over the ask-first amount, substitute, a new store only if the shopper asked, price changed since approval, final sale, **can't be undone**: a no-return kind of item such as personalized, perishable, tickets or digital, or no return policy found anywhere, same item within 24 hours). Every guess level still asks before anything that can't be undone. Any hard-limit or check failure releases the hold; a requirement nobody could check counts as a failure, never a pass.
 
@@ -48,7 +48,7 @@ Enforcement order: hard limits first (amount, stores, quantity, expiry, gift car
 All money-moving calls are plain REST in `lib/paypal.ts` and `lib/hold.ts`; the AI never reaches them. (The Agent Toolkit's `create_order` always uses intent `CAPTURE`, so holds go through REST directly.)
 
 - **PayPal button (JS SDK v6):** `app/paypal-approve.tsx` loads the v6 web SDK with a browser-safe client token (`app/api/paypal/client-token/route.ts`, `response_type=client_token`), checks eligibility for `VAULT_WITHOUT_PAYMENT`, and starts a PayPal save-payment session. The shopper signs in and agrees in PayPal's own window.
-- **Saved account (Vault v3):** the server creates the setup token (`app/api/paypal/setup-token/route.ts`, `/v3/vault/setup-tokens`), then turns the approved one into a payment token (`/v3/vault/payment-tokens`) in `app/api/approve/route.ts`. The vault id is sealed into the approval and never sent to the browser. Without the button, the approval uses the saved demo account (`PAYPAL_DEMO_VAULT_ID`), after confirming it still exists.
+- **Saved account (Vault v3):** the server creates the setup token (`app/api/paypal/setup-token/route.ts`, `/v3/vault/setup-tokens`), then turns the approved one into a payment token (`/v3/vault/payment-tokens`) in `app/api/approve/route.ts`. The vault id is sealed into the approval and never sent to the browser. The fallback link uses a saved sandbox test account (`PAYPAL_DEMO_VAULT_ID`), after confirming it still exists.
 - **Hold:** `POST /v2/checkout/orders` with `intent: "AUTHORIZE"` and `payment_source.paypal.vault_id`, so no shopper login is needed per purchase (`vaultedHoldOrderBody` in `lib/paypal.ts`, `placeHold` in `lib/hold.ts`).
 - **Capture:** `captureHold` first reads the authorization, refuses unless its status is `CREATED`, and refuses any amount above `min(held, shopper's limit)`. PayPal itself allows capturing up to 115% of a hold; this code does not. Captures send `final_capture: true`.
 - **Void:** `releaseHold` voids the authorization, then reads it back. An "asks you first" hold nobody answers is voided after 30 minutes, and a late "Pay" can't charge it (`lib/pending.ts`).
@@ -104,7 +104,7 @@ Caveats, as recorded in the log: several prompt fixes were found on the same cas
 
 ## Safety invariants and tests
 
-`npm test` runs 166 tests (166 pass, 0 skipped, as of this README). What they guarantee:
+`npm test` runs 170 tests (170 pass, 0 skipped, as of this README). What they guarantee:
 
 - **Never charges above the limit:** 10,000 random seeded cases where no capture ever breaks a promise to the shopper (`tests/enforce-invariants.test.mts`); one cent over the limit releases the hold; nothing above what PayPal holds is captured; no limit means nothing is charged (`tests/enforce.test.mts`).
 - **Unverifiable means no:** a must-have nobody could check, or a missing checker result, releases the hold; a failed hard limit wins over any check-in (`tests/enforce.test.mts`).

@@ -34,7 +34,8 @@ export function readbackRows(m: Mandate): Row[] {
   const max = m.payment.amount_range;
   if (max.max !== null) {
     // The demo holds the listed item price; shipping and tax aren't known, so the screen doesn't claim them.
-    rows.push({ said: max.source_phrase, willDo: `Up to ${money(max.max)} for the item · shipping not checked`, label: "locked" });
+    const qty = m.checkout.line_items[0]?.quantity ?? 1;
+    rows.push({ said: max.source_phrase, willDo: `Up to ${money(max.max)} ${qty > 1 ? `in total for all ${qty}` : "in total"} · shipping not checked`, label: "locked" });
   }
   for (const li of m.checkout.line_items) {
     rows.push({ said: li.source_phrase, willDo: li.quantity > 1 ? `${li.quantity} × ${li.description} only` : `${cap(li.description)} only`, label: "checked" });

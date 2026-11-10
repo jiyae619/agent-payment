@@ -5,7 +5,7 @@
 // request text (and the words each rule came from) is never shown here.
 
 import { useState } from "react";
-import type { Proof } from "@/lib/proof.ts";
+import { OUTCOME_TEXT, type Proof } from "@/lib/proof.ts";
 
 type Result = { intact: boolean; paypal: { order_status: string; custom_id: string | null; matches: boolean } | null };
 
@@ -69,6 +69,7 @@ export default function Verify() {
                   {proof.picked.store} · {proof.picked.quantity} × ${proof.picked.price_each} = ${proof.picked.total} ·{" "}
                   {proof.picked.reason_written_by === "shopper" ? "the shopper chose this over the recommendation" : "the recommended option"}
                 </p>
+                <p className="sub"><b>Outcome: {proof.outcome ? OUTCOME_TEXT[proof.outcome.status] : proof.decision.action}</b>{proof.outcome?.status === "charged" ? ` · $${proof.outcome.amount}` : ""}</p>
                 <p className="sub">Guess level: {proof.level ?? "Allow guesses"} · approved {new Date(proof.approved_at).toLocaleString()}</p>
               </div>
 
@@ -105,7 +106,7 @@ export default function Verify() {
                   ))}
                 </ol>
               </div>
-              <p className="note">The shopper&apos;s own request isn&apos;t shown here. It stays with them.</p>
+              <p className="note">The shopper&apos;s own words aren&apos;t in this file. It holds only a fingerprint, so they can prove what they wrote if they choose to.</p>
             </>
           )}
         </>

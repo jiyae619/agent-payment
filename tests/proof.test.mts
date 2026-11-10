@@ -5,7 +5,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { CatalogProduct } from "../lib/catalog.ts";
 import type { Mandate } from "../lib/mandate.ts";
-import { buildProof, proofIsIntact, sealProof, whoCovers } from "../lib/proof.ts";
+import { buildProof, fingerprint, proofIsIntact, sealProof, whoCovers } from "../lib/proof.ts";
 
 process.env.APPROVAL_SECRET = "test-secret-that-is-at-least-32-characters-long";
 
@@ -55,4 +55,18 @@ test("who covers it: a charged purchase names Purchase Protection and what it do
   assert.match(lines, /Purchase Protection may cover/);
   assert.match(lines, /isn't what you wanted, Purchase Protection doesn't cover it/);
   assert.deepEqual(whoCovers(false, true), ["Nothing was charged, so there is nothing to claim."]);
+});
+
+test("the shareable file never holds the shopper's own words, only a fingerprint of them", () => {
+  // The file goes to stores and PayPal; the request is the shopper's, so only they can reveal it.
+  const text = JSON.stringify(proof);
+  assert.ok(!text.includes("3 bottles of dish soap"), "request or a phrase from it leaked");
+  assert.ok(!text.includes("under $50"), "a source phrase leaked");
+  assert.equal(proof.request_sha256, fingerprint(mandate.source_text));
+  // The rules themselves are still there, so the store can see what was approved.
+  assert.equal(proof.instructions.payment.amount_range.max, 50);
+});
+
+test("the outcome says where the money ended up, separate from what enforcement decided at the hold", () => {
+  assert.deepEqual(proof.outcome, { status: "charged", amount: 13.65 });
 });

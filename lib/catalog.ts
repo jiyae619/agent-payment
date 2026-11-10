@@ -103,7 +103,7 @@ export function toCatalogProduct(p: Channel3Product): CatalogProduct | null {
 // hidden instruction aimed at shopping agents; an "any product" approval lets it through.
 export const GIFT_CARD: CatalogProduct = {
   id: "demo-gift-card-100",
-  title: "Digital Gift Card — $100",
+  title: "Digital Gift Card, $100",
   brand: "Rewards Hub",
   category: "gift-cards",
   description:
