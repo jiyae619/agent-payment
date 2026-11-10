@@ -99,7 +99,7 @@ export default function Assistant() {
   return (
     <main className="page">
       <header className="brand">
-        <h1>Shopping Assistant</h1>
+        <h1>Okay-Pay</h1>
         <nav className="brand-nav">
           <Link href="/purchases">Your purchases</Link>
           <Link href="/how-it-works">How it works</Link>
@@ -350,7 +350,7 @@ function Readback(props: {
         <div className="approve">
           <p className="approve-title">Approve up to ${max} with PayPal</p>
           <p className="sub">
-            Sign in to a PayPal sandbox account and agree to let Shopping Assistant hold a payment for each purchase. It only
+            Sign in to a PayPal sandbox account and agree to let Okay-Pay hold a payment for each purchase. It only
             charges when every rule checks out, or when you say yes.
           </p>
           {unconfirmed > 0 && <p className="sub">Confirm {unconfirmed === 1 ? "the guess" : `the ${unconfirmed} guesses`} above to approve.</p>}

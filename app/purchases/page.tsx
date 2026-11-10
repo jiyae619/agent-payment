@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import Purchases from "./purchases";
 
 export const metadata: Metadata = {
-  title: "Your purchases · Shopping Assistant",
+  title: "Your purchases · Okay-Pay",
   description: "What the assistant bought for you, with a refund for anything you changed your mind about.",
 };
 

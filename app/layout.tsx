@@ -8,14 +8,17 @@ const sans = Atkinson_Hyperlegible({ variable: "--font-sans", subsets: ["latin"]
 const mono = IBM_Plex_Mono({ variable: "--font-mono", subsets: ["latin"], weight: ["500"] });
 
 export const metadata: Metadata = {
-  title: "Shopping Assistant",
+  title: "Okay-Pay",
   description: "Hand off a purchase in your own words, and get proof it matches what you meant.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={`${sans.variable} ${mono.variable} antialiased`}>
-      <body>{children}</body>
+      <body>
+        {children}
+        <footer className="site-foot">Okay-Pay is a hackathon demo on PayPal sandbox. Not affiliated with or endorsed by PayPal.</footer>
+      </body>
     </html>
   );
 }

@@ -110,7 +110,7 @@ export function holdOrderBody(cap: number, description: string, returnUrl: strin
     payment_source: {
       paypal: {
         experience_context: {
-          brand_name: "Shopping Assistant (sandbox)",
+          brand_name: "Okay-Pay (sandbox)",
           user_action: "CONTINUE",
           shipping_preference: "NO_SHIPPING",
           return_url: returnUrl,
@@ -143,12 +143,12 @@ export function setupTokenBody(returnUrl: string, cancelUrl: string) {
   return {
     payment_source: {
       paypal: {
-        description: "Shopping Assistant holds a payment for each purchase you approve and charges only within your rules",
+        description: "Okay-Pay holds a payment for each purchase you approve and charges only within your rules",
         usage_type: "MERCHANT",
         customer_type: "CONSUMER",
         usage_pattern: "IMMEDIATE",
         experience_context: {
-          brand_name: "Shopping Assistant (sandbox)",
+          brand_name: "Okay-Pay (sandbox)",
           shipping_preference: "NO_SHIPPING",
           vault_instruction: "ON_PAYER_APPROVAL",
           return_url: returnUrl,

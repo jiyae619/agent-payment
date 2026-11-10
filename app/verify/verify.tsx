@@ -63,7 +63,7 @@ export default function Verify() {
       {proof && result && (
         <>
           <p className={result.intact ? "result-good" : "alert"}>
-            {result.intact ? "✓ This record is exactly what Shopping Assistant issued." : "✕ This record was changed after it was issued. Don't rely on it."}
+            {result.intact ? "✓ This record is exactly what Okay-Pay issued." : "✕ This record was changed after it was issued. Don't rely on it."}
           </p>
           {result.intact && (
             <p className="sub">

@@ -1,4 +1,4 @@
-# Shopping Assistant
+# Okay-Pay
 
 AI shopping agents can spend money, and an approval that only names a total ("up to $120") lets them buy the wrong thing. This app lets a non-technical shopper approve exactly what the agent may buy, and PayPal only charges when code confirms the purchase matches.
 

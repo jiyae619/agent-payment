@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import Diagram from "./diagram";
 
 export const metadata: Metadata = {
-  title: "How it works · Shopping Assistant",
+  title: "How it works · Okay-Pay",
   description: "What happens behind the screen: where the AI helps, where code decides, and when PayPal moves money.",
 };
 

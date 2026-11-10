@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import Verify from "./verify";
 
 export const metadata: Metadata = {
-  title: "Check a purchase · Shopping Assistant",
+  title: "Check a purchase · Okay-Pay",
   description: "For stores and PayPal: check a purchase record against its PayPal order, without seeing the shopper's own words.",
 };
 
