@@ -3,6 +3,7 @@ import { checkProduct } from "@/lib/check-product.ts";
 import { releaseExpiredHolds } from "@/lib/hold.ts";
 import { allowRun, visitorKey } from "@/lib/guard.ts";
 import { pick } from "@/lib/pick.ts";
+import { rankChecked } from "@/lib/pick-core.ts";
 import { optionView, type Choice } from "@/lib/purchase.ts";
 import { searchProducts } from "@/lib/search.ts";
 import { searchQuery, shortlist, whyDropped } from "@/lib/shortlist.ts";
@@ -70,9 +71,9 @@ export async function POST(request: Request) {
       // 2. Check each shortlisted listing (AI, with every quote verified by code), then pick (AI).
       step("check", `Checking ${candidates.length} ${candidates.length === 1 ? "listing" : "listings"}`);
       const reqs = [...m.ext.must_haves, ...m.ext.conditions_of_sale];
-      let checked;
+      let found;
       try {
-        checked = await Promise.all(candidates.map(async (product) => {
+        found = await Promise.all(candidates.map(async (product) => {
           const r = await checkProduct(product, reqs);
           const ok = r.checks.filter((x) => x.verdict === "checked").length;
           send({ type: "item", id: product.id, ok, of: r.checks.length });
@@ -81,6 +82,8 @@ export async function POST(request: Request) {
       } catch {
         return finish(502, { ...base, error: "The AI couldn't check the products right now. Nothing was held or bought." });
       }
+      // Ranked by what the store's own words prove about the shopper's requirements, then price.
+      const checked = rankChecked(found);
       if (stopped()) return finish(499, { ...base, outcome: "stopped" });
       const quantity = m.checkout.line_items[0]?.quantity ?? 1;
       let chosen;
@@ -95,7 +98,7 @@ export async function POST(request: Request) {
       step("pick", "Picked one", undefined, { id: c.product.id });
 
       // 3. Stop here and let the shopper choose: the recommendation first, then up to two runner-ups
-      // that were checked the same way. Nothing is held until they tap one (/api/shop/buy).
+      // in ranked order, checked the same way. Nothing is held until they tap one (/api/shop/buy).
       const ordered = [c, ...checked.filter((x) => x.product.id !== c.product.id)].slice(0, 3);
       const choice: Choice = {
         approval: String(body.approval),

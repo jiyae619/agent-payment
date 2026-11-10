@@ -83,8 +83,8 @@ export type Mandate = z.infer<typeof Mandate>;
 export type Pref = z.infer<typeof Pref>;
 export type Checkin = z.infer<typeof Checkin>;
 
-// Safe defaults for people who never set rules: ask before substitutes and new stores.
+// Safe default for people who never set rules: ask before a substitute. Asking before a new store
+// is only added when the shopper says so.
 export const DEFAULT_CHECKINS: Checkin[] = [
   { type: "substitute", source_phrase: null },
-  { type: "new_store", source_phrase: null },
 ];

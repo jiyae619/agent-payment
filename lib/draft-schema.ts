@@ -75,8 +75,8 @@ export function normalizeDraft(draft: Draft, sourceText: string, now = new Date(
 
   // Default: ask before a substitute, unless the shopper already said so or wants only the exact item.
   if (!checkins.some((c) => c.type === "substitute")) checkins.push(DEFAULT_CHECKINS[0]);
-  // Default: ask before a store the shopper didn't name, unless they said any store is fine.
-  if (!draft.any_store_ok_phrase && !checkins.some((c) => c.type === "new_store")) checkins.push(DEFAULT_CHECKINS[1]);
+  // No default for stores: it asks before a new store only when the shopper said so. Stores they
+  // named (to use or to avoid) are hard limits instead.
 
   const recurring = draft.recurrence !== "one_time";
   const hours = draft.valid_for_hours.hours ?? (recurring ? 24 * 30 : 24);

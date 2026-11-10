@@ -46,8 +46,8 @@ test("amounts: sizes, counts and pack sizes are never mistaken for money", () =>
   assert.deepEqual(amountsSaid("around $100 but no more than $110"), [100, 110]);
 });
 
-test("a draft that matches the shopper's words raises only the store question", () => {
-  assert.deepEqual(ids(shoesText, shoesDraft()), ["any_store"]);
+test("a draft that matches the shopper's words raises no questions", () => {
+  assert.deepEqual(ids(shoesText, shoesDraft()), []);
 });
 
 test("a draft that allows more than the shopper said is caught, and the fix restores their number", () => {
@@ -115,9 +115,12 @@ test("a store named by its brand isn't flagged: 'Brooks' names brooksrunning.com
   assert.ok(ids(text, other).includes("store_not_named"));
 });
 
-test("safe defaults: it asks before substitutes and unnamed stores unless the shopper said otherwise", () => {
+test("safe defaults: it asks before substitutes, but before a new store only when the shopper asked", () => {
+  // A default new-store question made almost every run stop to ask about an ordinary store.
   const m = normalizeDraft(shoesDraft(), shoesText, NOW);
-  assert.deepEqual(m.ext.checkins.map((c) => c.type).sort(), ["new_store", "over_amount", "substitute"]);
+  assert.deepEqual(m.ext.checkins.map((c) => c.type).sort(), ["over_amount", "substitute"]);
+  const asked = normalizeDraft(shoesDraft({ checkins: [{ type: "new_store", amount: null, source_phrase: "ask me before a new store" }] }), shoesText, NOW);
+  assert.ok(asked.ext.checkins.some((c) => c.type === "new_store" && c.source_phrase === "ask me before a new store"));
   const anyStore = normalizeDraft(shoesDraft({ any_store_ok_phrase: "any store is fine" }), shoesText, NOW);
   assert.equal(anyStore.ext.checkins.some((c) => c.type === "new_store"), false);
   assert.equal(findWarnings(anyStore, NOW).some((w) => w.id === "any_store"), false);
