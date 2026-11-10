@@ -6,7 +6,8 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Mandate } from "@/lib/mandate.ts";
-import { readbackRows, type Label } from "@/lib/readback.ts";
+import { describe, readbackRows, type Label } from "@/lib/readback.ts";
+import { guesses, guessKey, LEVELS, setGuess, type Guess, type Level } from "@/lib/guesses.ts";
 import { clearHistory, loadHistory } from "@/lib/history.ts";
 import { suggest, type Suggestion } from "@/lib/suggest.ts";
 import { applyFix, findWarnings, type Fix, type Warning } from "@/lib/warnings.ts";
@@ -56,6 +57,8 @@ export default function Assistant() {
   const [payer, setPayer] = useState<string | null>(null);
   // Opt-in, off by default: share "before → after" when the shopper rewrites their request.
   const [shareEdit, setShareEdit] = useState(false);
+  // How much it may guess, picked with each request (lib/guesses.ts).
+  const [level, setLevel] = useState<Level>("allow");
   const [shopStage, setShopStage] = useState<ShopStage>(2);
   const onStage = useCallback((s: ShopStage) => setShopStage(s), []);
   const stage = editing || !mandate ? 0 : !approval ? 1 : shopStage;
@@ -135,6 +138,19 @@ export default function Assistant() {
               <span>A web page hides orders for the agent</span>
             </a>
           </div>
+          <fieldset className="levels">
+            <legend className="sub">When it has to guess what you meant</legend>
+            <div className="level-row">
+              {LEVELS.map((l) => (
+                <label key={l.id} className={level === l.id ? "level on" : "level"}>
+                  <input type="radio" name="level" value={l.id} checked={level === l.id} onChange={() => setLevel(l.id)} />
+                  <b>{l.name}</b>
+                  <span>{l.id === "allow" ? "Default. " : ""}{l.note}</span>
+                </label>
+              ))}
+            </div>
+            <p className="note">Every level asks you first before anything that can&apos;t be undone.</p>
+          </fieldset>
           <button type="button" className="btn primary" onClick={readBack} disabled={loading || !text.trim()}>
             {loading ? "Reading your request…" : "Show me what it will do"}
           </button>
@@ -152,12 +168,14 @@ export default function Assistant() {
       ) : !approval ? (
         <Readback
           mandate={mandate}
+          level={level}
           dismissed={dismissed}
           approved={approval !== null}
           payer={payer}
           onEdit={edit}
           onFix={(w) => w.fix && setMandate(applyFix(mandate, w.fix.action))}
           onApply={(fix) => setMandate(applyFix(mandate, fix))}
+          onGuess={(g, value) => setMandate(setGuess(mandate, g, value))}
           onKeep={(w) => setDismissed((d) => [...d, w.id + w.message])}
           onApproved={(token, approved, who) => {
             setPayer(who);
@@ -207,6 +225,8 @@ function PastPurchases({ mandate, onApply }: { mandate: Mandate; onApply: (fix: 
 
 function Readback(props: {
   mandate: Mandate;
+  level: Level;
+  onGuess: (g: Guess, value: string) => void;
   dismissed: string[];
   approved: boolean;
   payer: string | null;
@@ -225,13 +245,26 @@ function Readback(props: {
   const max = mandate.payment.amount_range.max;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const found = useMemo(() => guesses(mandate), [mandate]);
+  // Guesses the shopper looked at and kept. "Check guesses" needs every one; a changed guess is
+  // their own words and stops being a guess.
+  const [confirmed, setConfirmed] = useState<string[]>([]);
+  const [open, setOpen] = useState<string | null>(null);
+  const unconfirmed = props.level === "check" ? found.filter((g) => !confirmed.includes(guessKey(g))).length : 0;
+  const guessed = new Set(found.map((g) => (g.list === "must_haves" ? "Must be " : "Store must offer ") + describe(g.attr, g.value)));
+  const tag = (r: (typeof list)[number]) => (r.label === "never" ? "always" : guessed.has(r.willDo) ? "my guess" : r.said ? "your words" : "safe default");
+  const keep = (g: Guess, value: string) => {
+    if (value.trim() && value.trim() !== g.value) props.onGuess(g, value);
+    else setConfirmed((c) => [...c, guessKey(g)]);
+    setOpen(null);
+  };
 
   // vaultSetupToken: from the PayPal button (the shopper's own PayPal). Without it: the demo account.
   async function approve(vaultSetupToken?: string) {
     setBusy(true);
     setError(null);
     try {
-      const res = await fetch("/api/approve", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mandate, vaultSetupToken }) });
+      const res = await fetch("/api/approve", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mandate, level: props.level, vaultSetupToken }) });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error ?? "Approval didn't go through. Please try again.");
       props.onApproved(data.approval, data.mandate, data.payer);
@@ -244,18 +277,34 @@ function Readback(props: {
 
   return (
     <section className="sheet" aria-labelledby="asked-title">
-      <span className="step" id="asked-title">You asked</span>
-      <div className="quote">&ldquo;{mandate.source_text}&rdquo;</div>
+      <span className="step" id="asked-title">I&apos;ll buy</span>
+      <Summary mandate={mandate} found={found} level={props.level} confirmed={confirmed} open={open} onOpen={setOpen} onKeep={keep} />
+      <p className="quote small">You said: &ldquo;{mandate.source_text}&rdquo;</p>
       {!approved && <button type="button" className="link" onClick={props.onEdit}>Edit request</button>}
 
-      <ul className="list" aria-label="What it will do">
-        {list.map((r, i) => (
-          <li key={i} className="li">
-            <span className={`mark ${MARK[r.label].cls}`} role="img" aria-label={MARK[r.label].name}>{MARK[r.label].sym}</span>
-            <span className="what">{r.willDo}</span>
+      {found.length > 0 && (
+        <p className="guess-note" role="status">
+          <span className="mark ask small" aria-hidden>!</span>
+          {found.length === 1 ? "1 guess" : `${found.length} guesses`}: {found.map((g) => `"${g.phrase ?? g.attr}"`).join(", ")}.{" "}
+          {props.level === "check" ? (unconfirmed ? `Tap each one to confirm it (${unconfirmed} left).` : "All confirmed.") : props.level === "auto" ? "Auto-shop uses its best guess." : "Tap one to change it."}
+        </p>
+      )}
+
+      <details className="rules">
+        <summary>See all {list.length + 1} rules</summary>
+        <ul className="list" aria-label="What it will do">
+          {list.map((r, i) => (
+            <li key={i} className="li">
+              <span className={`mark ${MARK[r.label].cls}`} role="img" aria-label={MARK[r.label].name}>{MARK[r.label].sym}</span>
+              <span className="what">{r.willDo} <span className="note inline">· {tag(r)}</span></span>
+            </li>
+          ))}
+          <li className="li">
+            <span className="mark ask" role="img" aria-label="Asks you first">!</span>
+            <span className="what">Asks you if it can&apos;t be undone, like a final-sale item <span className="note inline">· always</span></span>
           </li>
-        ))}
-      </ul>
+        </ul>
+      </details>
 
       {mandate.ext.unmapped.length > 0 && (
         <div>
@@ -299,9 +348,10 @@ function Readback(props: {
             PayPal asks you to let Shopping Assistant hold a payment for each purchase. It only charges when every rule above
             checks out, or when you say yes.
           </p>
-          <PayPalApprove disabled={busy} onSaved={(token) => void approve(token)} />
+          {unconfirmed > 0 && <p className="sub">Confirm {unconfirmed === 1 ? "the guess" : `the ${unconfirmed} guesses`} above to approve.</p>}
+          <PayPalApprove disabled={busy || unconfirmed > 0} onSaved={(token) => void approve(token)} />
           <p className="or-line"><span>or</span></p>
-          <button type="button" className="btn secondary" onClick={() => void approve()} disabled={busy}>
+          <button type="button" className="btn secondary" onClick={() => void approve()} disabled={busy || unconfirmed > 0}>
             {busy ? "Approving…" : "Try with the demo account"}
           </button>
           <p className="approved-line">No PayPal sandbox login needed. It uses a sandbox PayPal account that&apos;s already saved.</p>
@@ -310,5 +360,59 @@ function Readback(props: {
         </div>
       )}
     </section>
+  );
+}
+
+// The one-line "I'll buy" summary. Fixed template from the rules; guesses appear as chips the
+// shopper can open to keep or change (plain text under Auto-shop, which uses its best guess).
+function Summary(props: { mandate: Mandate; found: Guess[]; level: Level; confirmed: string[]; open: string | null; onOpen: (k: string | null) => void; onKeep: (g: Guess, value: string) => void }) {
+  const { mandate: m, found } = props;
+  const li = m.checkout.line_items[0];
+  const item = li ? `${li.quantity > 1 ? `${li.quantity} × ` : ""}${li.description}` : "anything that fits";
+  const guessAt = (list: Guess["list"], index: number) => found.find((g) => g.list === list && g.index === index);
+  const parts: (string | Guess)[] = [];
+  for (const list of ["must_haves", "conditions_of_sale"] as const) {
+    m.ext[list].forEach((p, i) => parts.push(guessAt(list, i) ?? (list === "conditions_of_sale" ? `with ${describe(p.attr, p.value)}` : describe(p.attr, p.value))));
+  }
+  const max = m.payment.amount_range.max;
+  const stores = m.checkout.allowed_merchants.map((s) => s.domain);
+  const editing = found.find((g) => guessKey(g) === props.open);
+  return (
+    <>
+      <p className="summary">
+        {item.charAt(0).toUpperCase() + item.slice(1)}
+        {parts.map((p, i) => (
+          <span key={i}>
+            {", "}
+            {typeof p === "string" ? p : props.level === "auto" ? (
+              <span className="guess-chip auto">{describe(p.attr, p.value)}</span>
+            ) : (
+              <button type="button" className={props.confirmed.includes(guessKey(p)) ? "guess-chip ok" : "guess-chip"} aria-expanded={props.open === guessKey(p)} onClick={() => props.onOpen(props.open === guessKey(p) ? null : guessKey(p))}>
+                {describe(p.attr, p.value)} <span aria-hidden>▾</span>
+              </button>
+            )}
+          </span>
+        ))}
+        {max !== null && `, under $${max}`}
+        {stores.length > 0 && `, only from ${stores.join(" or ")}`}.
+      </p>
+      {editing && <GuessEditor key={guessKey(editing)} guess={editing} onKeep={props.onKeep} onCancel={() => props.onOpen(null)} />}
+    </>
+  );
+}
+
+function GuessEditor({ guess, onKeep, onCancel }: { guess: Guess; onKeep: (g: Guess, value: string) => void; onCancel: () => void }) {
+  const [value, setValue] = useState(guess.value);
+  const same = value.trim() === guess.value;
+  return (
+    <div className="guess-edit">
+      <p className="sub">You said &ldquo;{guess.phrase ?? guess.attr}&rdquo;. It read that as <b>{describe(guess.attr, guess.value)}</b>.</p>
+      <label className="sr-only" htmlFor="guess-value">{guess.attr}</label>
+      <input id="guess-value" className="guess-input" value={value} onChange={(e) => setValue(e.target.value)} />
+      <div className="btns">
+        <button type="button" className="btn primary" onClick={() => onKeep(guess, value)} disabled={!value.trim()}>{same ? "Keep this guess" : "Use my words"}</button>
+        <button type="button" className="btn secondary" onClick={onCancel}>Close</button>
+      </div>
+    </div>
   );
 }

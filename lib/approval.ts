@@ -5,11 +5,13 @@
 // the saved PayPal account's id, which PayPal says to keep on the server. Plain code, no AI.
 
 import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { isLevel, type Level } from "./guesses.ts";
 import { Mandate } from "./mandate.ts";
 
 export class ApprovalError extends Error {}
 
-export type Approval = { mandate: Mandate; approved_at: string };
+// level: how much the shopper let it guess (lib/guesses.ts). Older approvals without one read as "allow".
+export type Approval = { mandate: Mandate; approved_at: string; level?: Level };
 
 function secret(): string {
   const s = process.env.APPROVAL_SECRET;
@@ -55,6 +57,6 @@ export function unseal(token: string): unknown {
 export const sealApproval = (approval: Approval): string => seal(approval);
 
 export function openApproval(token: string): Approval {
-  const data = unseal(token) as { mandate: unknown; approved_at: unknown };
-  return { mandate: Mandate.parse(data.mandate), approved_at: String(data.approved_at) };
+  const data = unseal(token) as { mandate: unknown; approved_at: unknown; level?: unknown };
+  return { mandate: Mandate.parse(data.mandate), approved_at: String(data.approved_at), level: isLevel(data.level) ? data.level : "allow" };
 }

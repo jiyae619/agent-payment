@@ -7,6 +7,7 @@ import { createHash } from "node:crypto";
 import { signText, verifyText } from "./approval.ts";
 import type { CatalogProduct } from "./catalog.ts";
 import type { CheckResult, Decision } from "./enforce.ts";
+import { levelName, type Level } from "./guesses.ts";
 import type { Mandate } from "./mandate.ts";
 import type { Policy } from "./policy.ts";
 import { LABEL_TEXT, readbackRows } from "./readback.ts";
@@ -20,6 +21,7 @@ export type Proof = {
   sandbox: true;
   shopper_words: string;
   approved_at: string;
+  level: string; // how much the shopper let it guess, e.g. "Allow guesses"
   read_back: { you_said: string | null; it_will: string; how_sure: string }[];
   cant_promise: { phrase: string; reason: string }[];
   instructions: Mandate;
@@ -36,6 +38,7 @@ export type Proof = {
 export function buildProof(args: {
   mandate: Mandate;
   approved_at: string;
+  level?: Level;
   search: Proof["search"];
   product: CatalogProduct;
   quantity: number;
@@ -54,6 +57,7 @@ export function buildProof(args: {
     sandbox: true,
     shopper_words: m.source_text,
     approved_at: args.approved_at,
+    level: levelName(args.level ?? "allow"),
     read_back: readbackRows(m).map((r) => ({ you_said: r.said, it_will: r.willDo, how_sure: LABEL_TEXT[r.label] })),
     cant_promise: m.ext.unmapped,
     // The saved PayPal account's id is left out: this file is meant to be shared with a store or PayPal.

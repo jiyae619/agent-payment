@@ -26,7 +26,9 @@ const mandate: Mandate = {
 const approval = { mandate, approved_at: "2026-11-07T00:00:00.000Z" };
 
 test("an untouched approval opens with the limits the shopper approved", () => {
-  assert.deepEqual(openApproval(sealApproval(approval)), approval);
+  // An approval sealed before levels existed reads as the default level, "allow".
+  assert.deepEqual(openApproval(sealApproval(approval)), { ...approval, level: "allow" });
+  assert.equal(openApproval(sealApproval({ ...approval, level: "check" })).level, "check");
 });
 
 test("changing the approval after it was sealed is refused", () => {

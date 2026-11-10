@@ -5,6 +5,7 @@
 
 import { createHash } from "node:crypto";
 import { openApproval, seal } from "./approval.ts";
+import { levelName } from "./guesses.ts";
 import type { CatalogProduct } from "./catalog.ts";
 import { decide, type CheckResult, type Decision, type Proposal } from "./enforce.ts";
 import { captureHold, placeHold, readOrder, releaseHold } from "./hold.ts";
@@ -67,13 +68,13 @@ export async function purchase(choice: Choice, productId: string): Promise<{ sta
 
   const key = createHash("sha256").update(`${choice.approval}|${c.product.id}`).digest("hex").slice(0, 32);
   const events: ProofEvent[] = [
-    { at: approved.approved_at, what: "You approved these instructions with PayPal." },
+    { at: approved.approved_at, what: `You approved these instructions with PayPal (${levelName(approved.level ?? "allow")}).` },
     { at: new Date().toISOString(), what: `You chose "${c.product.title}" from ${choice.candidates.length} checked options.` },
   ];
   const note = (what: string) => events.push({ at: new Date().toISOString(), what });
   const record = (decision: Decision, paypal: PayPalRecord) =>
     buildProof({
-      mandate: m, approved_at: approved.approved_at, search: { source: choice.search_source, funnel, shortlist },
+      mandate: m, approved_at: approved.approved_at, level: approved.level, search: { source: choice.search_source, funnel, shortlist },
       product: c.product, quantity, total: proposal.total, reason, by, checks: c.checks, policy: c.policy,
       decision, paypal, events,
     });

@@ -87,7 +87,7 @@ export function readbackRows(m: Mandate): Row[] {
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
-function describe(attr: string, value: string): string {
+export function describe(attr: string, value: string): string {
   const v = value.trim().toLowerCase();
   if (v === "yes" || v === "true") return attr;
   if (attr.toLowerCase() === "size") return `size ${value}`;

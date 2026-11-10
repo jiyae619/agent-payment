@@ -1,8 +1,9 @@
 import { ApprovalError, sealApproval } from "@/lib/approval.ts";
+import { isLevel } from "@/lib/guesses.ts";
 import { Mandate } from "@/lib/mandate.ts";
 import { PayPalError, paypal, savedAccountFrom } from "@/lib/paypal.ts";
 
-// POST { mandate, vaultSetupToken? } → { approval, mandate, payer }
+// POST { mandate, level?, vaultSetupToken? } → { approval, mandate, payer }
 // The shopper approves the instructions they just checked.
 // - With the official PayPal button: they logged in to their own (sandbox) PayPal and agreed, on
 //   PayPal's screen, to let this app hold and charge it. The setup token becomes their saved account.
@@ -14,6 +15,7 @@ export async function POST(request: Request) {
   const parsed = Mandate.safeParse(body.mandate);
   if (!parsed.success) return Response.json({ error: "These instructions couldn't be read. Please start again." }, { status: 400 });
   const mandate = parsed.data;
+  const level = isLevel(body.level) ? body.level : "allow";
 
   // Enforcement releases any hold without a limit, so approving one would only fail later.
   if (mandate.payment.amount_range.max === null) {
@@ -43,7 +45,7 @@ export async function POST(request: Request) {
       payer = "the demo PayPal account (sandbox)";
     }
     const approved = { ...mandate, payment: { ...mandate.payment, vault_id: vaultId } };
-    const approval = sealApproval({ mandate: approved, approved_at: new Date().toISOString() });
+    const approval = sealApproval({ mandate: approved, approved_at: new Date().toISOString(), level });
     // The browser gets the rules back without the saved account's id.
     return Response.json({ approval, mandate: { ...approved, payment: { ...approved.payment, vault_id: null } }, payer });
   } catch (err) {
