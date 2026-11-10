@@ -18,7 +18,7 @@ type Step = { step: string; text: string; count?: number };
 type ShelfItem = { id: string; title: string; price: number; store: string; image: string | null };
 type Shelf = { items: ShelfItem[]; kept?: string[]; dropped?: Record<string, string>; checked: Record<string, { ok: number; of: number }>; picked?: string };
 const NO_SHELF: Shelf = { items: [], checked: {} };
-type Option = { product: CatalogProduct; checks: CheckResult[]; policy: Policy | null; returns?: Returns; total: number; total_line: string | null };
+type Option = { wont_pass?: string[]; product: CatalogProduct; checks: CheckResult[]; policy: Policy | null; returns?: Returns; total: number; total_line: string | null };
 type ShopResult = {
   outcome?: "choose" | "bought" | "released" | "ask" | "nothing_found" | "stopped";
   options?: Option[];
@@ -518,13 +518,23 @@ function Choose({ result, buying, onBuy, onEdit }: { result: ShopResult; buying:
   return (
     <section className="sheet" aria-live="polite" aria-labelledby="choose-title">
       <span className="step" id="choose-title">Choose one</span>
-      <p className="title">{options.length === 1 ? "It found one option that fits" : `It found ${options.length} options that fit your rules`}</p>
+      {(() => {
+        const ok = options.filter((o) => !o.wont_pass?.length).length;
+        return (
+          <p className="title">
+            {ok === 0 ? "None of these pass all your rules" : ok === 1 ? "One option passes all your rules" : `${ok} options pass all your rules`}
+          </p>
+        );
+      })()}
+      {options.every((o) => o.wont_pass?.length) && (
+        <p className="sub">Nothing was held. Edit your request, for example drop a must-have the stores don&apos;t confirm or raise the limit.</p>
+      )}
       <ul className="options">
         {options.map((o) => {
-          const isRec = o.product.id === rec?.id;
-          const checked = o.checks.filter((c) => c.verdict === "checked").length;
+          const blocked = (o.wont_pass?.length ?? 0) > 0;
+          const isRec = o.product.id === rec?.id && !blocked;
           return (
-            <li key={o.product.id} className={isRec ? "option rec" : "option"}>
+            <li key={o.product.id} className={isRec ? "option rec" : blocked ? "option off" : "option"}>
               {isRec && <span className="badge">Recommended</span>}
               <div className="product">
                 {o.product.image ? (
@@ -556,19 +566,20 @@ function Choose({ result, buying, onBuy, onEdit }: { result: ShopResult; buying:
                   ))}
                 </span>
               )}
-              {o.returns && (
+              {o.returns && !blocked && (
                 <p className={o.returns.evidence === "listing" || o.returns.evidence === "policy" ? "returns" : "returns ask"}>
                   {o.returns.label}
                   {o.returns.evidence !== "listing" && o.returns.evidence !== "policy" && ". It will ask you before paying."}
                 </p>
               )}
               {isRec && rec && <p className="why"><b>Why this one:</b> {rec.reason}{rec.by === "ai" && <span className="ai-tag">AI</span>}</p>}
-              {o.checks.length > 0 && checked < o.checks.length && (
-                <p className="sub">{o.checks.length - checked} of your must-haves couldn&apos;t be confirmed, so it would likely be released.</p>
+              {blocked ? (
+                <p className="wont"><b>Won&apos;t pass:</b> {o.wont_pass!.join(" ")}</p>
+              ) : (
+                <button type="button" className={isRec ? "btn primary" : "btn secondary"} disabled={buying !== null} onClick={() => onBuy(o.product.id)}>
+                  {buying === o.product.id ? "PayPal is holding…" : `Choose this · ${money(o.total)}`}
+                </button>
               )}
-              <button type="button" className={isRec ? "btn primary" : "btn secondary"} disabled={buying !== null} onClick={() => onBuy(o.product.id)}>
-                {buying === o.product.id ? "PayPal is holding…" : `Choose this · ${money(o.total)}`}
-              </button>
             </li>
           );
         })}

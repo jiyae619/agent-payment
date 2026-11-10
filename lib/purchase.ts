@@ -13,6 +13,7 @@ import { ANSWER_MINUTES, trackPending } from "./pending.ts";
 import { PayPalError } from "./paypal.ts";
 import { totalLine } from "./pick-core.ts";
 import type { Returns } from "./check-core.ts";
+import type { Mandate } from "./mandate.ts";
 import type { Policy } from "./policy.ts";
 import { buildProof, sealProof, type PayPalRecord, type ProofEvent } from "./proof.ts";
 import { isNamedItem, type FunnelStep } from "./shortlist.ts";
@@ -31,8 +32,18 @@ export type Choice = {
 const round = (n: number) => Math.round(n * 100) / 100;
 
 // What the choose screen shows for one option: the product, its checks and its total, in code.
-export function optionView(c: Candidate, quantity: number) {
-  return { product: c.product, checks: c.checks, policy: c.policy, returns: c.returns, total: round(c.product.price * quantity), total_line: totalLine(c.product.price, quantity) };
+export function optionView(c: Candidate, quantity: number, wont_pass: string[] = []) {
+  return { wont_pass, product: c.product, checks: c.checks, policy: c.policy, returns: c.returns, total: round(c.product.price * quantity), total_line: totalLine(c.product.price, quantity) };
+}
+
+// The same rule check enforcement runs after the hold, run first with no money held. An option that
+// would be released anyway is shown as "won't pass" and can't be chosen, so PayPal never holds money
+// for a purchase the rules already rule out. Returns the reasons it fails; empty means it can go ahead.
+export function wontPass(m: Mandate, c: Candidate, quantity: number, now = new Date()): string[] {
+  const total = round(c.product.price * quantity);
+  const proposal: Proposal = { product: c.product, quantity, total, checks: c.checks, is_substitute: !isNamedItem(m, c.product), final_sale: c.final_sale, returns: c.returns.evidence };
+  const d = decide(m, proposal, { now, held: total });
+  return d.action === "void" ? d.reasons.map((r) => r.message) : [];
 }
 
 export async function purchase(choice: Choice, productId: string): Promise<{ status: number; body: object }> {
@@ -43,6 +54,8 @@ export async function purchase(choice: Choice, productId: string): Promise<{ sta
   if (max === null || !vaultId) return { status: 400, body: { error: "This approval has no spending limit or PayPal account." } };
   const c = choice.candidates.find((x) => x.product.id === productId);
   if (!c) return { status: 400, body: { error: "That option isn't one it checked. Please choose again." } };
+  const fails = wontPass(m, c, choice.quantity);
+  if (fails.length) return { status: 400, body: { error: `This one can't pass your rules, so nothing was held. ${fails.join(" ")}` } };
 
   const { quantity, funnel, shortlist } = choice;
   const recommended = choice.recommended.id === productId;

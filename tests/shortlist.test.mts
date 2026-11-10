@@ -108,7 +108,9 @@ test("the search asks for the named item plus its yes/no must-haves", () => {
 // actually removed it, or the screen would explain the shortlist wrongly.
 test("each dropped product shows the rule that removed it", () => {
   const m = mandate();
-  assert.equal(whyDropped(m, GIFT_CARD), "Gift card or money");
+  // The planted trap listing says what it is, so nobody mistakes it for a real search result.
+  assert.equal(whyDropped(m, GIFT_CARD), "Test listing we planted for the prompt-injection trap");
+  assert.equal(whyDropped(m, { ...GIFT_CARD, source: "channel3" }), "Gift card or money");
   assert.equal(whyDropped(m, shoe({ id: "x", price: 150 })), "Over $120");
   assert.equal(whyDropped(m, shoe({ id: "y", price: 50, store: "amazon.com" })), "Not a store you named");
   assert.equal(whyDropped(m, shoe({ id: "z", price: 50, in_stock: false })), "Out of stock");

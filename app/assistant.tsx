@@ -18,6 +18,7 @@ import Shopping, { type ShopStage } from "./shopping";
 const STARTERS = [
   { label: "Running shoes", watch: "Strict rules: size, free returns, asks above $100", text: "Waterproof running shoes, size 8, under $120. Free returns please. Ask me if it's over $100." },
   { label: "Dish soap", watch: "Buys 3; your limit covers the total", text: "3 bottles of dish soap, under $50 for all of them. Any store is fine." },
+  { label: "A guess to check", watch: "\"Doesn't smell like anything\" becomes a rule you confirm", text: "Dish soap that doesn't smell like anything, under $20." },
 ];
 
 export const MARK: Record<Label, { cls: string; sym: string; name: string }> = {
@@ -139,19 +140,6 @@ export default function Assistant() {
               <span>A web page hides orders for the agent</span>
             </a>
           </div>
-          <fieldset className="levels">
-            <legend className="sub">When it has to guess what you meant</legend>
-            <div className="level-row">
-              {LEVELS.map((l) => (
-                <label key={l.id} className={level === l.id ? "level on" : "level"}>
-                  <input type="radio" name="level" value={l.id} checked={level === l.id} onChange={() => setLevel(l.id)} />
-                  <b>{l.name}</b>
-                  <span>{l.id === "allow" ? "Default. " : ""}{l.note}</span>
-                </label>
-              ))}
-            </div>
-            <p className="note">Every level asks before it buys anything that can&apos;t be undone.</p>
-          </fieldset>
           <button type="button" className="btn primary" onClick={readBack} disabled={loading || !text.trim()}>
             {loading ? "Reading your request…" : "Show me what it will do"}
           </button>
@@ -170,6 +158,7 @@ export default function Assistant() {
         <Readback
           mandate={mandate}
           level={level}
+          onLevel={setLevel}
           dismissed={dismissed}
           approved={approval !== null}
           payer={payer}
@@ -227,6 +216,7 @@ function PastPurchases({ mandate, onApply }: { mandate: Mandate; onApply: (fix: 
 function Readback(props: {
   mandate: Mandate;
   level: Level;
+  onLevel: (l: Level) => void;
   onGuess: (g: Guess, value: string) => void;
   dismissed: string[];
   approved: boolean;
@@ -283,6 +273,20 @@ function Readback(props: {
       <p className="quote small">You said: &ldquo;{mandate.source_text}&rdquo;</p>
       {!approved && <button type="button" className="link" onClick={props.onEdit}>Edit request</button>}
 
+      {found.length > 0 && (
+        <fieldset className="levels">
+          <legend className="sub">It had to guess what you meant. How should it handle that?</legend>
+          <div className="level-row">
+            {LEVELS.map((l) => (
+              <label key={l.id} className={props.level === l.id ? "level on" : "level"}>
+                <input type="radio" name="level" value={l.id} checked={props.level === l.id} onChange={() => props.onLevel(l.id)} />
+                <b>{l.name}</b>
+                <span>{l.note}</span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+      )}
       {found.length > 0 && (
         <p className="guess-note" role="status">
           <span className="mark ask small" aria-hidden>!</span>

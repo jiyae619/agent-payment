@@ -4,7 +4,7 @@ import { releaseExpiredHolds } from "@/lib/hold.ts";
 import { allowRun, visitorKey } from "@/lib/guard.ts";
 import { pick } from "@/lib/pick.ts";
 import { rankChecked } from "@/lib/pick-core.ts";
-import { optionView, type Choice } from "@/lib/purchase.ts";
+import { optionView, wontPass, type Choice } from "@/lib/purchase.ts";
 import { searchProducts } from "@/lib/search.ts";
 import { searchQuery, shortlist, whyDropped } from "@/lib/shortlist.ts";
 
@@ -56,8 +56,9 @@ export async function POST(request: Request) {
       };
 
       // 1. Search and shortlist: plain code.
-      const search = await searchProducts(searchQuery(m), { maxPrice: max, limit: 8 });
-      const { funnel, candidates } = shortlist(m, search.products);
+      const search = await searchProducts(searchQuery(m), { maxPrice: max, limit: 12 });
+      // Check up to 6 listings so at least one is likely to pass; the shopper still sees the best 3.
+      const { funnel, candidates } = shortlist(m, search.products, 6);
       // The live shelf: what it found, then what each of your rules removed.
       const items = search.products.map((p) => ({ id: p.id, title: p.title, price: p.price, store: p.store, image: p.image }));
       step("search", "Searched stores", funnel[0]?.count, { items });
@@ -83,12 +84,17 @@ export async function POST(request: Request) {
         return finish(502, { ...base, error: "The AI couldn't check the products right now. Nothing was held or bought." });
       }
       // Ranked by what the store's own words prove about the shopper's requirements, then price.
-      const checked = rankChecked(found);
+      // Options that can pass every rule come first; the rest are shown as "won't pass".
+      const ranked = rankChecked(found);
+      const fails = new Map(ranked.map((x) => [x.product.id, wontPass(m, x, m.checkout.line_items[0]?.quantity ?? 1)]));
+      const checked = [...ranked.filter((x) => !fails.get(x.product.id)!.length), ...ranked.filter((x) => fails.get(x.product.id)!.length)];
       if (stopped()) return finish(499, { ...base, outcome: "stopped" });
       const quantity = m.checkout.line_items[0]?.quantity ?? 1;
       let chosen;
       try {
-        chosen = await pick(m.source_text, checked, quantity);
+        // Recommend only among options that can pass, when there are any.
+        const passing = checked.filter((x) => !fails.get(x.product.id)!.length);
+        chosen = await pick(m.source_text, passing.length ? passing : checked, quantity);
       } catch {
         // The pick is a convenience: if the AI is unavailable, the code's top-ranked option is used.
         chosen = { product: checked[0].product, reason: "It ranked first on what you asked for.", by: "code" as const };
@@ -113,7 +119,7 @@ export async function POST(request: Request) {
         ...base,
         outcome: "choose",
         recommended: choice.recommended,
-        options: choice.candidates.map((x) => optionView(x, quantity)),
+        options: choice.candidates.map((x) => optionView(x, quantity, fails.get(x.product.id))),
         choice: seal(choice),
       });
     },

@@ -284,3 +284,7 @@ details.more ol { margin: 10px 0 0; padding-left: 18px; font-size: 14px; display
 .order:last-child { border-bottom: 0; }
 .order-head { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
 .money.small { font-size: 17px; }
+
+.option.off { opacity: .75; }
+.wont { margin: 0; font-size: 14px; color: var(--ink); background: var(--soft); border-radius: 8px; padding: 8px 10px; }
+.order-actions { display: flex; gap: 16px; flex-wrap: wrap; }

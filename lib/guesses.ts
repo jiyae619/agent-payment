@@ -8,9 +8,9 @@ import type { Mandate } from "./mandate.ts";
 export type Level = "check" | "allow" | "auto";
 
 export const LEVELS: { id: Level; name: string; note: string }[] = [
-  { id: "check", name: "Check guesses", note: "You confirm each guess before approving" },
-  { id: "allow", name: "Allow guesses", note: "Best guesses filled in, tap one to change it" },
-  { id: "auto", name: "Auto-shop", note: "Uses its best guesses" },
+  { id: "check", name: "Check each guess", note: "Confirm each one before you approve" },
+  { id: "allow", name: "Allow guesses", note: "The default. Tap one to change it" },
+  { id: "auto", name: "Use best guesses", note: "No chips. You still choose what to buy" },
 ];
 
 export const levelName = (l: Level) => LEVELS.find((x) => x.id === l)!.name;

@@ -4,7 +4,7 @@
 // says whether the seal holds and whether the PayPal order carries the same proof id. The shopper's
 // request text (and the words each rule came from) is never shown here.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { OUTCOME_TEXT, type Proof } from "@/lib/proof.ts";
 
 type Result = { intact: boolean; paypal: { order_status: string; custom_id: string | null; matches: boolean } | null };
@@ -17,13 +17,16 @@ export default function Verify() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  async function open(file: File) {
+
+  const open = async (file: File) => check(await file.text());
+
+  async function check(text: string) {
     setError(null);
     setResult(null);
     setProof(null);
     setBusy(true);
     try {
-      const saved = JSON.parse(await file.text());
+      const saved = JSON.parse(text);
       if (!saved?.proof || typeof saved.seal !== "string") throw new Error("This isn't a saved proof file.");
       const res = await fetch("/api/proof/verify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ proof: saved.proof, seal: saved.seal }) });
       const data = await res.json();
@@ -37,6 +40,18 @@ export default function Verify() {
     }
   }
 
+
+  // Opened from Your purchases: the proof is waiting in this browser, so check it straight away.
+  useEffect(() => {
+    let handed: string | null = null;
+    try {
+      handed = localStorage.getItem("shopping-assistant:verify");
+      localStorage.removeItem("shopping-assistant:verify");
+    } catch {
+      // storage blocked: use the file button
+    }
+    if (handed) void check(handed);
+  }, []);
   return (
     <section className="sheet" aria-live="polite">
       <label className="btn secondary file-pick">

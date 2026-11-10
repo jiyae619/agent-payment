@@ -15,9 +15,10 @@ Built for the PayPal AI Hackathon. PayPal sandbox only: nothing real is ever cha
 
 ### Try these
 
-1. **Running shoes** starter: "Waterproof running shoes, size 8, under $120. Free returns please. Ask me if it's over $100." Read the approval screen, approve, and watch it search and check each requirement against the store's own words. It then shows up to 3 options that passed, recommended one first. PayPal holds money only after you tap **Choose this**, then enforcement charges, releases, or asks you first. If a hold is released, **Choose another option** goes back to the list.
+1. **Running shoes** starter: "Waterproof running shoes, size 8, under $120. Free returns please. Ask me if it's over $100." Read the approval screen, approve, and watch it search and check each requirement against the store's own words. It checks up to 6 listings, runs the same rules enforcement will use, and shows the best 3. An option that can't pass says "Won't pass" and why, and can't be chosen, so PayPal never holds money for it. PayPal holds money only after you tap **Choose this**, then enforcement charges, releases, or asks you first. If a hold is released, **Choose another option** goes back to the list.
 2. **Dish soap** starter: "3 bottles of dish soap, under $50 for all of them. Any store is fine." Shows the quantity total (price × 3 must fit the limit). While it shops, a live shelf shows every product found and the rule that removed each one.
-3. **Why the approval screen matters** (bottom of the page): a product page hides a note telling shopping agents to buy its $100 gift card. The same simulated, fooled agent runs twice. Under a total-only approval, PayPal sandbox takes the money. Under this app's approval, the gift card never reaches the agent's choice, and enforcement would release the hold if it did.
+3. **A guess to check** starter: "Dish soap that doesn't smell like anything, under $20." The AI reads that as scent: unscented and shows it as a guess chip. Pick how it handles guesses (check each, allow, or use best guesses), and change the chip before approving.
+4. **Why the approval screen matters** (bottom of the page): a product page hides a note telling shopping agents to buy its $100 gift card. The same simulated, fooled agent runs twice. Under a total-only approval, PayPal sandbox takes the money. Under this app's approval, the gift card never reaches the agent's choice, and enforcement would release the hold if it did.
 
 ## How it works
 
@@ -104,7 +105,7 @@ Caveats, as recorded in the log: several prompt fixes were found on the same cas
 
 ## Safety invariants and tests
 
-`npm test` runs 170 tests (170 pass, 0 skipped, as of this README). What they guarantee:
+`npm test` runs 172 tests (172 pass, 0 skipped, as of this README). What they guarantee:
 
 - **Never charges above the limit:** 10,000 random seeded cases where no capture ever breaks a promise to the shopper (`tests/enforce-invariants.test.mts`); one cent over the limit releases the hold; nothing above what PayPal holds is captured; no limit means nothing is charged (`tests/enforce.test.mts`).
 - **Unverifiable means no:** a must-have nobody could check, or a missing checker result, releases the hold; a failed hard limit wins over any check-in (`tests/enforce.test.mts`).

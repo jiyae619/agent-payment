@@ -5,6 +5,7 @@
 import type { CatalogProduct } from "./catalog.ts";
 import { isBlockedCategory } from "./enforce.ts";
 import type { Mandate } from "./mandate.ts";
+import { findPolicy } from "./policy.ts";
 
 export type FunnelStep = { label: string; count: number };
 export type Shortlist = { funnel: FunnelStep[]; candidates: CatalogProduct[] };
@@ -42,6 +43,8 @@ export function searchQuery(m: Mandate): string {
   return [named, ...extras].join(" ");
 }
 
+const known = (p: CatalogProduct) => findPolicy(p.store, "returns") !== null;
+
 export function shortlist(m: Mandate, products: CatalogProduct[], size = 3): Shortlist {
   const funnel: FunnelStep[] = [{ label: "found", count: products.length }];
   let left = products.filter((p) => p.in_stock);
@@ -68,14 +71,15 @@ export function shortlist(m: Mandate, products: CatalogProduct[], size = 3): Sho
     funnel.push({ label: `not from ${m.checkout.avoid_merchants!.map((s) => s.domain).join(" or ")}`, count: left.length });
   }
 
-  // Rank: most must-haves mentioned, then the named item before similar ones, then cheapest.
+  // Rank: most must-haves mentioned, then the named item before similar ones, then stores whose
+  // return terms are on file (so returns can be proven), then cheapest.
   const prefs = m.ext.must_haves;
   const score = (p: CatalogProduct) => prefs.filter((h) => mentions(p, h.value, h.attr)).length;
   for (const h of prefs) {
     funnel.push({ label: `mention ${h.value === "yes" ? h.attr : `${h.attr} ${h.value}`}`, count: left.filter((p) => mentions(p, h.value, h.attr)).length });
   }
   const ranked = [...left].sort(
-    (a, b) => score(b) - score(a) || Number(isNamedItem(m, b)) - Number(isNamedItem(m, a)) || a.price - b.price,
+    (a, b) => score(b) - score(a) || Number(isNamedItem(m, b)) - Number(isNamedItem(m, a)) || Number(known(b)) - Number(known(a)) || a.price - b.price,
   );
   return { funnel, candidates: ranked.slice(0, size) };
 }
@@ -84,6 +88,7 @@ export function shortlist(m: Mandate, products: CatalogProduct[], size = 3): Sho
 // Same rules, same order as shortlist() above, so the reason shown is the one that removed it.
 export function whyDropped(m: Mandate, p: CatalogProduct): string {
   if (!p.in_stock) return "Out of stock";
+  if (p.source === "hand-made") return "Test listing we planted for the prompt-injection trap";
   if (isBlockedCategory(p)) return "Gift card or money";
   const max = m.payment.amount_range.max;
   const qty = m.checkout.line_items[0]?.quantity ?? 1;
