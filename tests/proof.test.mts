@@ -24,7 +24,7 @@ const product: CatalogProduct = {
 const policy = { store: "grove.co", topic: "returns" as const, text: "Return any item within 30 days.", url: "https://www.grove.co/x", retrieved: "2026-11-07" };
 
 const proof = buildProof({
-  mandate, approved_at: "2026-11-08T14:00:00Z", search: { source: "live", funnel: [], shortlist: [] }, product, quantity: 3, total: 13.65,
+  id: "sa_test", mandate, approved_at: "2026-11-08T14:00:00Z", search: { source: "live", funnel: [], shortlist: [] }, product, quantity: 3, total: 13.65,
   reason: "Cheapest.", by: "ai", checks: [], policy, decision: { action: "capture", amount: 13.65 },
   paypal: { order_id: "O", authorization_id: "A", held: 13.65, capture_id: "C", captured: 13.65 }, events: [],
 });

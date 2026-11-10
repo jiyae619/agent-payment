@@ -18,6 +18,7 @@ export type PayPalRecord = { order_id: string; authorization_id: string; held: n
 
 export type Proof = {
   record: "shopping-assistant-proof/v1";
+  id: string; // also on the PayPal order as purchase_units.custom_id
   sandbox: true;
   shopper_words: string;
   approved_at: string;
@@ -36,6 +37,7 @@ export type Proof = {
 };
 
 export function buildProof(args: {
+  id: string;
   mandate: Mandate;
   approved_at: string;
   level?: Level;
@@ -54,6 +56,7 @@ export function buildProof(args: {
   const m = args.mandate;
   return {
     record: "shopping-assistant-proof/v1",
+    id: args.id,
     sandbox: true,
     shopper_words: m.source_text,
     approved_at: args.approved_at,

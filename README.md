@@ -28,7 +28,7 @@ The app runs one step per screen: **Ask → Approve → Shop → Choose → Pay*
 | 1 | Shopper writes the request in their own words | Shopper | `app/assistant.tsx` |
 | 2 | Draft structured instructions (limit, stores, must-haves, check-ins, can't-promise) | **AI** (Claude Sonnet 5, high effort) | `lib/draft.ts`, `lib/draft-prompt.ts` |
 | 3 | Readback: one line per rule, tied to the shopper's words; warnings for anything the draft added or lost | Code (fixed templates, no AI text) | `lib/readback.ts`, `lib/warnings.ts` |
-| 4 | Shopper approves; the approval is sealed (AES-256-GCM, so the browser can neither read the saved PayPal account nor change a rule), and a raised limit or new store is refused later | Code | `lib/approval.ts`, `app/api/approve/route.ts` |
+| 4 | One approval screen: an "I'll buy" summary where every rule the AI interpreted is a guess chip (found by code: the value isn't in the shopper's words), the full rule list folded. The shopper picks a level with each request: **Check guesses** (confirm each before Approve unlocks), **Allow guesses** (default), **Auto-shop**. The approval is sealed (AES-256-GCM, so the browser can neither read the saved PayPal account nor change a rule), and a raised limit or new store is refused later | Code | `lib/approval.ts`, `app/api/approve/route.ts` |
 | 5 | Product search (live Channel3, saved snapshot as backup) | Code | `lib/search.ts`, `lib/catalog.ts` |
 | 6 | Shortlist: price × quantity under the limit, allowed stores only, avoided stores dropped, no gift cards or money-like items | Code | `lib/shortlist.ts` |
 | 7 | Check each requirement: Checked / Didn't match / Couldn't check, quoting the listing or return policy | **AI** (Claude Sonnet 5, high effort) | `lib/check-product.ts` |
@@ -41,7 +41,7 @@ The app runs one step per screen: **Ask → Approve → Shop → Choose → Pay*
 | 14 | Enforcement decides: capture, void, or ask the shopper first | Code (pure function, no AI, no network) | `lib/enforce.ts` |
 | 15 | Receipt read back from PayPal, plus a sealed proof record the shopper can keep; Refund on the receipt | Code | `lib/hold.ts` (`readOrder`, `refundCapture`), `lib/proof.ts` |
 
-Enforcement order: hard limits first (amount, stores, quantity, expiry, gift cards, exact item), then the checker's results, then check-ins (over the ask-first amount, substitute, unnamed store, price changed since approval, final sale, same item within 24 hours). Any hard-limit or check failure releases the hold; a requirement nobody could check counts as a failure, never a pass.
+Enforcement order: hard limits first (amount, stores, quantity, expiry, gift cards, exact item), then the checker's results, then check-ins (over the ask-first amount, substitute, a new store only if the shopper asked, price changed since approval, final sale, **can't be undone**: a no-return kind of item such as personalized, perishable, tickets or digital, or no return policy found anywhere, same item within 24 hours). Every guess level still asks before anything that can't be undone. Any hard-limit or check failure releases the hold; a requirement nobody could check counts as a failure, never a pass.
 
 ## PayPal integration
 
@@ -54,6 +54,7 @@ All money-moving calls are plain REST in `lib/paypal.ts` and `lib/hold.ts`; the 
 - **Void:** `releaseHold` voids the authorization, then reads it back. An "asks you first" hold nobody answers is voided after 30 minutes, and a late "Pay" can't charge it (`lib/pending.ts`).
 - **Refund:** `refundCapture` (`POST /v2/payments/captures/{id}/refund`) refuses unless the capture is `COMPLETED`; the refund is added to the proof record (`app/api/refund/route.ts`).
 - **Idempotency:** every money-moving POST sends `PayPal-Request-Id` from `stepRequestId(resource, step)`: stable per step on one resource, so a retried charge or release replays PayPal's first answer instead of acting twice. The hold's key is stable per approval + product.
+- **Proof ID on the order:** every hold sets `purchase_units[0].custom_id` to the proof record's id and puts the returns label plus anything not confirmed in the item description. [`/verify`](https://shopping-assistant-z5u2.onrender.com/verify) lets a store or PayPal open a saved proof: it checks the seal, reads the PayPal order and confirms its `custom_id` matches, then shows the rules, quotes, level and timeline, never the shopper's own words (`app/api/proof/verify/route.ts`, `app/verify/`).
 - **Read-back:** the receipt shows `GET /v2/checkout/orders/{id}` as PayPal reports it, never assumed from our own calls.
 - The vault id is set by the server, never by the model, and is left out of the shareable proof file.
 
@@ -103,14 +104,17 @@ Caveats, as recorded in the log: several prompt fixes were found on the same cas
 
 ## Safety invariants and tests
 
-`npm test` runs 154 tests (154 pass, 0 skipped, as of this README). What they guarantee:
+`npm test` runs 166 tests (166 pass, 0 skipped, as of this README). What they guarantee:
 
 - **Never charges above the limit:** 10,000 random seeded cases where no capture ever breaks a promise to the shopper (`tests/enforce-invariants.test.mts`); one cent over the limit releases the hold; nothing above what PayPal holds is captured; no limit means nothing is charged (`tests/enforce.test.mts`).
 - **Unverifiable means no:** a must-have nobody could check, or a missing checker result, releases the hold; a failed hard limit wins over any check-in (`tests/enforce.test.mts`).
 - **Quotes must be the store's words:** a "Checked" with no quote or a quote not in the listing becomes "couldn't check"; a skipped requirement never counts as passed (`tests/check-product.test.mts`).
 - **Gift cards never reach the pick or the charge**, even with any store allowed (`tests/shortlist.test.mts`, `tests/attack.test.mts`).
 - **Sealed approval:** raising the limit after approval, or a seal from another secret, is refused; a missing or short secret fails loudly (`tests/approval.test.mts`).
-- **Proof record:** an edited proof no longer checks out; the saved account's vault id never goes into the shareable file; the return policy is kept word for word with a fingerprint (`tests/proof.test.mts`).
+- **Can't be undone asks first:** a no-return kind of item, or no return policy found, always asks; returns stated in the listing or on the store's policy page don't (`tests/returns.test.mts`, `tests/enforce.test.mts`).
+- **Guesses:** a rule whose value the shopper didn't literally say is shown as a guess, and changing it makes it theirs (`tests/guesses.test.mts`).
+- **Ranking:** most requirements proven by the store's words first, then fewest contradictions, then cheapest (`tests/pick-core.test.mts`).
+- **Proof record:** every PayPal hold carries the proof id (`tests/paypal.test.mts`); an edited proof no longer checks out; the saved account's vault id never goes into the shareable file; the return policy is kept word for word with a fingerprint (`tests/proof.test.mts`).
 - **Idempotency:** a retried charge sends the same PayPal-Request-Id; charge and release never share one (`tests/paypal.test.mts`).
 - **The model can never set the payment account**; invented limits, added stores and an empty product list are all flagged on the readback (`tests/rules.test.mts`).
 - **Spend guard:** per-visitor hourly limit and a daily ceiling for the whole demo (`tests/guard.test.mts`).

@@ -122,14 +122,17 @@ export function holdOrderBody(cap: number, description: string, returnUrl: strin
 }
 
 // A hold for the real item, charged to a saved (vaulted) PayPal account. No shopper login needed.
-export function vaultedHoldOrderBody(vaultId: string, itemName: string, total: number) {
+// proofId goes in custom_id, so the merchant and PayPal can tie the order to the shopper's proof
+// record; note (the returns label and anything not confirmed) goes in the item description.
+export function vaultedHoldOrderBody(vaultId: string, itemName: string, total: number, extra: { proofId?: string; note?: string } = {}) {
   return {
     intent: "AUTHORIZE",
     purchase_units: [
       {
         description: itemName.slice(0, 127),
+        ...(extra.proofId ? { custom_id: extra.proofId.slice(0, 127) } : {}),
         amount: { ...money(total), breakdown: { item_total: money(total) } },
-        items: [{ name: itemName.slice(0, 127), quantity: "1", unit_amount: money(total), category: "PHYSICAL_GOODS" }],
+        items: [{ name: itemName.slice(0, 127), ...(extra.note ? { description: extra.note.slice(0, 127) } : {}), quantity: "1", unit_amount: money(total), category: "PHYSICAL_GOODS" }],
       },
     ],
     payment_source: { paypal: { vault_id: vaultId } },

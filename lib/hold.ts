@@ -7,8 +7,8 @@ import { authorizationFrom, money, paypal, stepRequestId, vaultedHoldOrderBody, 
 export type Hold = { orderId: string; authorizationId: string; amount: number; status: string };
 
 // requestKey is stable for one approval + one product, so a retried request can't hold twice.
-export async function placeHold(vaultId: string, itemName: string, total: number, requestKey: string): Promise<Hold> {
-  const order: Json = await paypal("POST", "/v2/checkout/orders", vaultedHoldOrderBody(vaultId, itemName, total), {
+export async function placeHold(vaultId: string, itemName: string, total: number, requestKey: string, extra: { proofId?: string; note?: string } = {}): Promise<Hold> {
+  const order: Json = await paypal("POST", "/v2/checkout/orders", vaultedHoldOrderBody(vaultId, itemName, total, extra), {
     requestId: stepRequestId(requestKey, "hold"),
   });
   const auth = authorizationFrom(order);
@@ -42,6 +42,7 @@ export async function readOrder(orderId: string) {
   const capture = payments.captures?.[0];
   return {
     order: String(order.status),
+    custom_id: order?.purchase_units?.[0]?.custom_id ? String(order.purchase_units[0].custom_id) : null,
     authorization: auth ? String(auth.status) : null,
     capture: capture ? { id: String(capture.id), status: String(capture.status), amount: Number(capture.amount?.value) } : null,
   };

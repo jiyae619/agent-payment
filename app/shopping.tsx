@@ -53,7 +53,7 @@ const money = (n: number) => `$${Number.isInteger(n) ? n : n.toFixed(2)}`;
 
 // Save as proof: the sealed record as a file the shopper keeps.
 function saveProof(proof: unknown, seal: string, orderId: string) {
-  const blob = new Blob([JSON.stringify({ proof, seal, check_at: "/api/proof/verify" }, null, 2)], { type: "application/json" });
+  const blob = new Blob([JSON.stringify({ proof, seal, check_at: "/verify" }, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -480,6 +480,9 @@ function Done({ result, onRefund }: { result: ShopResult; onRefund: () => Promis
         <button type="button" className="btn secondary" onClick={() => saveProof(result.proof, result.proof_seal!, result.proof!.paypal.order_id)}>
           Save as proof
         </button>
+      )}
+      {result.proof && result.proof_seal && (
+        <p className="note">A store or PayPal can check the saved file at <a href="/verify" target="_blank" rel="noreferrer">/verify</a>. Your own words stay private.</p>
       )}
       <details className="more">
         <summary>Details</summary>

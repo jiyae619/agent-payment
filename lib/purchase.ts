@@ -67,28 +67,32 @@ export async function purchase(choice: Choice, productId: string): Promise<{ sta
   };
 
   const key = createHash("sha256").update(`${choice.approval}|${c.product.id}`).digest("hex").slice(0, 32);
+  // The proof record's id, also put on the PayPal order (custom_id) so the two can be matched.
+  const proofId = `sa_${key}`;
+  const unconfirmed = c.checks.filter((x) => x.verdict !== "checked").map((x) => x.attr);
+  const note = [c.returns.label, unconfirmed.length ? `Not confirmed: ${unconfirmed.join(", ")}` : ""].filter(Boolean).join(" · ");
   const events: ProofEvent[] = [
     { at: approved.approved_at, what: `You approved these instructions with PayPal (${levelName(approved.level ?? "allow")}).` },
     { at: new Date().toISOString(), what: `You chose "${c.product.title}" from ${choice.candidates.length} checked options.` },
   ];
-  const note = (what: string) => events.push({ at: new Date().toISOString(), what });
+  const log = (what: string) => events.push({ at: new Date().toISOString(), what });
   const record = (decision: Decision, paypal: PayPalRecord) =>
     buildProof({
-      mandate: m, approved_at: approved.approved_at, level: approved.level, search: { source: choice.search_source, funnel, shortlist },
+      id: proofId, mandate: m, approved_at: approved.approved_at, level: approved.level, search: { source: choice.search_source, funnel, shortlist },
       product: c.product, quantity, total: proposal.total, reason, by, checks: c.checks, policy: c.policy,
       decision, paypal, events,
     });
 
   try {
-    const hold = await placeHold(vaultId, c.product.title, proposal.total, key);
-    note(`PayPal held $${hold.amount.toFixed(2)} for "${c.product.title}".`);
+    const hold = await placeHold(vaultId, c.product.title, proposal.total, key, { proofId, note });
+    log(`PayPal held $${hold.amount.toFixed(2)} for "${c.product.title}".`);
     const decision = decide(m, proposal, { now: new Date(), held: hold.amount });
     const paypal = { orderId: hold.orderId, authorizationId: hold.authorizationId, held: hold.amount };
     const ids: PayPalRecord = { order_id: hold.orderId, authorization_id: hold.authorizationId, held: hold.amount };
 
     if (decision.action === "capture") {
       const capture = await captureHold(hold.authorizationId, decision.amount, max);
-      note(`Every check passed, so PayPal took $${capture.amount.toFixed(2)}.`);
+      log(`Every check passed, so PayPal took $${capture.amount.toFixed(2)}.`);
       const status = await readOrder(hold.orderId);
       const proof = record(decision, { ...ids, capture_id: capture.captureId, captured: capture.amount, status: status.authorization ?? status.order });
       // The receipt can refund exactly this charge, and nothing else (sealed, like the approval).
@@ -97,7 +101,7 @@ export async function purchase(choice: Choice, productId: string): Promise<{ sta
     }
     if (decision.action === "void") {
       const released = await releaseHold(hold.authorizationId);
-      note(`PayPal released the hold: ${decision.reasons.map((r) => r.message).join(" ")}`);
+      log(`PayPal released the hold: ${decision.reasons.map((r) => r.message).join(" ")}`);
       // Loop 2 (anonymous): which rules released it, at which store, and which requirement couldn't be checked.
       console.info(`[outcome] ${JSON.stringify({
         at: new Date().toISOString(), outcome: "released", store: c.product.store,
@@ -110,7 +114,7 @@ export async function purchase(choice: Choice, productId: string): Promise<{ sta
     }
     // Ask: the hold stays open while the shopper decides, for ANSWER_MINUTES at most. The answer route
     // only accepts this sealed record, which also carries the proof so far.
-    note(`It asked you first: ${decision.checkins.map((x) => x.message).join(" ")}`);
+    log(`It asked you first: ${decision.checkins.map((x) => x.message).join(" ")}`);
     const proof = record(decision, { ...ids, status: hold.status });
     const expires = trackPending(hold.authorizationId);
     const pending = seal({ authorizationId: hold.authorizationId, orderId: hold.orderId, amount: proposal.total, limit: max, title: c.product.title, proof, expires_at: expires });

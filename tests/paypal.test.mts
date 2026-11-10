@@ -4,7 +4,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { paypal, stepRequestId } from "../lib/paypal.ts";
+import { paypal, stepRequestId, vaultedHoldOrderBody } from "../lib/paypal.ts";
 
 process.env.PAYPAL_CLIENT_ID = "test-id";
 process.env.PAYPAL_CLIENT_SECRET = "test-secret";
@@ -48,4 +48,15 @@ test("charging and releasing the same hold use different ids, so one never repla
 test("PayPal accepts the id: at most 108 characters", () => {
   // Authorization ids are ~17 characters; this leaves room for longer resource ids.
   assert.ok(stepRequestId("X".repeat(90), "vault-token").length <= 108);
+});
+
+test("every hold carries the proof id and the returns note, so the order can be matched to its proof", () => {
+  // A merchant or dispute agent sees custom_id on the PayPal order; the proof file has the same id.
+  const body = vaultedHoldOrderBody("V", "Trail shoes", 54.99, { proofId: "sa_abc", note: "Returns: stated in the listing · Not confirmed: free returns" });
+  assert.equal(body.purchase_units[0].custom_id, "sa_abc");
+  assert.match(body.purchase_units[0].items[0].description!, /Not confirmed: free returns/);
+  // PayPal caps both at 127 characters.
+  const long = vaultedHoldOrderBody("V", "x", 1, { proofId: "p".repeat(200), note: "n".repeat(200) });
+  assert.equal(long.purchase_units[0].custom_id!.length, 127);
+  assert.equal(long.purchase_units[0].items[0].description!.length, 127);
 });
