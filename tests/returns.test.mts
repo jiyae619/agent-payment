@@ -31,3 +31,17 @@ test("personalized, perishable, tickets and digital codes can't be undone even w
 test("final sale wins over everything else", () => {
   assert.equal(returnsFor(product({ description: "Final sale. Free returns on other items." }), policy).evidence, "final_sale");
 });
+
+test("a store that says it doesn't accept returns makes every item final sale (ATTITUDE's policy page)", async () => {
+  const { findPolicy } = await import("../lib/policy.ts");
+  const attitude = findPolicy("us-shop.attitudeliving.com", "returns");
+  assert.ok(attitude, "ATTITUDE's policy is on file");
+  assert.equal(returnsFor(product({ store: "us-shop.attitudeliving.com" }), attitude).evidence, "final_sale");
+  // A store with ordinary return terms on file counts as returnable without asking.
+  assert.equal(returnsFor(product({ store: "chewy.com" }), findPolicy("chewy.com", "returns")).evidence, "policy");
+});
+
+test("no policy excerpt mentions final sale, so one exception can't mark a whole store final sale", async () => {
+  const data = (await import("../data/policies.json", { with: { type: "json" } })).default as { policies: { store: string; text: string }[] };
+  for (const p of data.policies) assert.doesNotMatch(p.text, /final sale/i, p.store);
+});

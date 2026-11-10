@@ -1,5 +1,5 @@
 {
-  "_note": "Short excerpts copied word for word from each store's own policy page, with the page and the date they were read. Only stores whose official page could be read are listed: a store missing here means its policy couldn't be checked, never that it has none.",
+  "_note": "Short excerpts copied word for word from each store's own policy page, with the page and the date they were read. Only stores whose official page could be read are listed: a store missing here means its policy couldn't be checked, never that it has none. Each excerpt keeps the store's general return terms; exceptions for single item types (for example \"final sale\" items) are left out, because the listing itself is checked for those.",
   "policies": [
     {
       "store": "nike.com",
@@ -14,6 +14,41 @@
       "text": "If an item wasn’t right for you, reach out to us within 30 days of delivery. We’ll send you a pre-paid shipping label so you can make a seamless return and get a full refund.",
       "url": "https://www.grove.co/g/shipping-returns/",
       "retrieved": "2026-11-07"
+    },
+    {
+      "store": "chewy.com",
+      "topic": "returns",
+      "text": "Return items within 365 days of purchase with free return shipping. Most items are returnable.",
+      "url": "https://www.chewy.com/customer-care/returns/making-a-return/start-a-return",
+      "retrieved": "2026-11-10"
+    },
+    {
+      "store": "publicgoods.com",
+      "topic": "returns",
+      "text": "If you are unsatisfied with your purchase for any other reason, unused products in their original packaging may be returned within 14 days of delivery. Refunds will be issued to your original payment method after the returned items have been received and inspected.",
+      "url": "https://www.publicgoods.com/policies/refund-policy",
+      "retrieved": "2026-11-10"
+    },
+    {
+      "store": "attitudeliving.com",
+      "topic": "returns",
+      "text": "For reasons of hygiene, health and safety, as well as to reduce our environmental footprint by reducing additional packaging and transportation, we do not accept returns or exchanges.",
+      "url": "https://us-shop.attitudeliving.com/policies/refund-policy",
+      "retrieved": "2026-11-10"
+    },
+    {
+      "store": "academy.com",
+      "topic": "returns",
+      "text": "Academy offers returns for most unused, new condition items within 60 days of purchase, and issues refunds based on the original form of payment.",
+      "url": "https://www.academy.com/return-policy",
+      "retrieved": "2026-11-10"
+    },
+    {
+      "store": "zappos.com",
+      "topic": "returns",
+      "text": "Start your return online: Go to your Order History within your account within 60 days of receiving your order. Returns must not be damaged, incomplete, or contain items that don't match the original order.",
+      "url": "https://www.zappos.com/c/shipping-and-returns",
+      "retrieved": "2026-11-10"
     }
   ]
 }

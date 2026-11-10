@@ -30,7 +30,7 @@ export const quoteSources = (product: CatalogProduct, policy: Policy | null) => 
 // doesn't depend on the AI noticing it.
 export function isFinalSale(p: CatalogProduct, policy: Policy | null): boolean {
   const text = `${listingText(p)}\n${policy?.text ?? ""}`;
-  return /final sale|non-?returnable|no returns|cannot be returned|can't be returned/i.test(text);
+  return /final sale|non-?returnable|no returns|cannot be returned|can't be returned|(do not|don't|cannot|can't) accept returns/i.test(text);
 }
 
 // Can this purchase be undone? Plain code, from the store's own words. The evidence label is what
