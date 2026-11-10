@@ -6,7 +6,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import type { CatalogProduct } from "./catalog.ts";
-import { checkMessage, isFinalSale, quoteSources, verify } from "./check-core.ts";
+import { checkMessage, isFinalSale, quoteSources, returnsFor, verify, type Returns } from "./check-core.ts";
 import { CHECK_SYSTEM, CheckAnswer } from "./check-prompt.ts";
 import type { CheckResult } from "./enforce.ts";
 import type { Pref } from "./mandate.ts";
@@ -28,10 +28,11 @@ export async function checkProduct(
   product: CatalogProduct,
   reqs: Pref[],
   use: CheckModel = { model: MODEL, effort: EFFORT },
-): Promise<{ checks: CheckResult[]; policy: Policy | null; final_sale: boolean; usage?: { input_tokens: number; output_tokens: number } }> {
+): Promise<{ checks: CheckResult[]; policy: Policy | null; final_sale: boolean; returns: Returns; usage?: { input_tokens: number; output_tokens: number } }> {
   const policy = findPolicy(product.store, "returns");
   const final_sale = isFinalSale(product, policy);
-  if (reqs.length === 0) return { checks: [], policy, final_sale };
+  const returns = returnsFor(product, policy);
+  if (reqs.length === 0) return { checks: [], policy, final_sale, returns };
 
   const response = await new Anthropic().messages.parse({
     model: use.model,
@@ -42,5 +43,5 @@ export async function checkProduct(
   });
   if (!response.parsed_output) throw new CheckError(`The product check could not be read (stop reason: ${response.stop_reason}).`);
   const usage = { input_tokens: response.usage.input_tokens, output_tokens: response.usage.output_tokens };
-  return { checks: verify(reqs, response.parsed_output, quoteSources(product, policy)), policy, final_sale, usage };
+  return { checks: verify(reqs, response.parsed_output, quoteSources(product, policy)), policy, final_sale, returns, usage };
 }

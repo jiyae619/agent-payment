@@ -20,6 +20,7 @@ export type Proposal = {
   is_substitute: boolean; // true when this is not the item the shopper named (set by the pick step)
   final_sale?: boolean; // the listing says final sale / non-returnable; unset = the listing doesn't say
   price_at_approval?: number; // unit price the shopper saw when approving; unset = no earlier price to compare
+  returns?: "final_sale" | "kind" | "listing" | "policy" | "not_found"; // can it be undone (lib/check-core.ts returnsFor); unset = not known
 };
 
 export type Context = {
@@ -31,7 +32,7 @@ export type Context = {
 export type VoidRule =
   | "no_limit" | "over_limit" | "over_hold" | "bad_total" | "store_not_allowed" | "store_avoided" | "expired"
   | "over_quantity" | "blocked_category" | "not_exact_item" | "didnt_match" | "couldnt_check";
-export type CheckinRule = "over_amount" | "substitute" | "new_store" | "price_changed" | "final_sale" | "bought_recently";
+export type CheckinRule = "over_amount" | "substitute" | "new_store" | "price_changed" | "final_sale" | "cant_undo" | "bought_recently";
 
 export type Decision =
   | { action: "capture"; amount: number }
@@ -105,6 +106,9 @@ export function decide(m: Mandate, p: Proposal, ctx: Context): Decision {
     asks.push({ rule: "price_changed", message: `The price changed from ${money(p.price_at_approval)} to ${money(p.product.price)} since you approved.` });
   }
   if (p.final_sale) asks.push({ rule: "final_sale", message: "The store says this is final sale: it can't be returned." });
+  // Can it be undone? A kind of item that can't be returned, or no return policy anywhere, counts as no.
+  if (p.returns === "kind") asks.push({ rule: "cant_undo", message: "This kind of item usually can't be returned (personalized, perishable, a ticket or digital)." });
+  if (p.returns === "not_found") asks.push({ rule: "cant_undo", message: "No return policy was found for this store, so treat it as final sale." });
   const recent = (ctx.recent_purchases ?? []).some((r) => {
     const at = new Date(r.at).getTime();
     return r.product_id === p.product.id && !(ctx.now.getTime() - at >= DAY); // unreadable time counts as recent

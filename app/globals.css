@@ -211,6 +211,8 @@ details.more ol { margin: 10px 0 0; padding-left: 18px; font-size: 14px; display
 .hiw-note { background: var(--soft); border-left: 3px solid var(--accent); border-radius: 6px; padding: 8px 10px; }
 .hiw-guard { color: var(--muted); }
 .hiw-why b { font-weight: 700; }
+.returns { margin: 0; font-size: 13px; color: var(--muted); }
+.returns.ask { color: var(--ink); font-weight: 600; }
 .hiw-scenario { display: grid; gap: 6px; background: var(--soft); border-radius: 10px; padding: 10px 12px; font-size: 14px; }
 .hiw-guard b { color: var(--ink); }
 .hiw-file { font: 500 12px var(--font-mono), monospace; color: var(--muted); overflow-wrap: anywhere; }

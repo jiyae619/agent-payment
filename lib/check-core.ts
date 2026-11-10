@@ -33,6 +33,22 @@ export function isFinalSale(p: CatalogProduct, policy: Policy | null): boolean {
   return /final sale|non-?returnable|no returns|cannot be returned|can't be returned/i.test(text);
 }
 
+// Can this purchase be undone? Plain code, from the store's own words. The evidence label is what
+// the shopper sees; "kind" and "not_found" make enforcement ask before paying (lib/enforce.ts).
+export type ReturnsEvidence = "final_sale" | "kind" | "listing" | "policy" | "not_found";
+export type Returns = { evidence: ReturnsEvidence; label: string };
+
+// Items that usually can't be returned whatever the store's policy says.
+const NO_RETURN_KIND = /personali[sz]ed|custom[- ]?(made|printed|engraved)|engraved|monogram|perishable|fresh (flowers|food)|\btickets?\b|digital (download|code)|e-?gift/i;
+
+export function returnsFor(p: CatalogProduct, policy: Policy | null): Returns {
+  if (isFinalSale(p, policy)) return { evidence: "final_sale", label: "Returns: final sale, can't be returned" };
+  if (NO_RETURN_KIND.test(`${p.title}\n${p.category ?? ""}`)) return { evidence: "kind", label: "Returns: this kind of item usually can't be returned" };
+  if (/\breturn(s|able|ed)?\b/i.test(listingText(p))) return { evidence: "listing", label: "Returns: stated in the listing" };
+  if (policy) return { evidence: "policy", label: "Returns: found on the store's policy page" };
+  return { evidence: "not_found", label: "Returns: not found, treated as final sale, please check" };
+}
+
 // Keep only answers the store's words support.
 export function verify(reqs: Pref[], answer: CheckAnswer, sources: string): CheckResult[] {
   return reqs.map((r) => {

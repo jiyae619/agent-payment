@@ -99,6 +99,7 @@ function makeCase(rand: () => number) {
     checks,
     is_substitute: chance(0.2),
     ...(chance(0.1) ? { final_sale: true } : {}),
+    ...(chance(0.3) ? { returns: pick(["listing", "policy", "kind", "not_found"] as const) } : {}),
     ...(chance(0.3) ? { price_at_approval: pick([price, price, price + 1]) } : {}),
   };
 
@@ -141,6 +142,7 @@ function broken(c: Case, d: Decision): string[] {
     (has("new_store") && !allowed.includes(p.product.store)) ||
     (p.price_at_approval !== undefined && p.price_at_approval !== p.product.price) ||
     p.final_sale === true ||
+    p.returns === "kind" || p.returns === "not_found" ||
     (ctx.recent_purchases ?? []).some((r) => r.product_id === p.product.id && NOW - new Date(r.at).getTime() < 24 * HOUR);
   if (captured && fired) out.push("captured although a check-in fired");
 

@@ -11,11 +11,12 @@ import { captureHold, placeHold, readOrder, releaseHold } from "./hold.ts";
 import { ANSWER_MINUTES, trackPending } from "./pending.ts";
 import { PayPalError } from "./paypal.ts";
 import { totalLine } from "./pick-core.ts";
+import type { Returns } from "./check-core.ts";
 import type { Policy } from "./policy.ts";
 import { buildProof, sealProof, type PayPalRecord, type ProofEvent } from "./proof.ts";
 import { isNamedItem, type FunnelStep } from "./shortlist.ts";
 
-export type Candidate = { product: CatalogProduct; checks: CheckResult[]; policy: Policy | null; final_sale: boolean };
+export type Candidate = { product: CatalogProduct; checks: CheckResult[]; policy: Policy | null; final_sale: boolean; returns: Returns };
 export type Choice = {
   approval: string; // the sealed approval this run was made under
   quantity: number;
@@ -30,7 +31,7 @@ const round = (n: number) => Math.round(n * 100) / 100;
 
 // What the choose screen shows for one option: the product, its checks and its total, in code.
 export function optionView(c: Candidate, quantity: number) {
-  return { product: c.product, checks: c.checks, policy: c.policy, total: round(c.product.price * quantity), total_line: totalLine(c.product.price, quantity) };
+  return { product: c.product, checks: c.checks, policy: c.policy, returns: c.returns, total: round(c.product.price * quantity), total_line: totalLine(c.product.price, quantity) };
 }
 
 export async function purchase(choice: Choice, productId: string): Promise<{ status: number; body: object }> {
@@ -53,6 +54,7 @@ export async function purchase(choice: Choice, productId: string): Promise<{ sta
     checks: c.checks,
     is_substitute: !isNamedItem(m, c.product),
     final_sale: c.final_sale,
+    returns: c.returns.evidence,
   };
   const shown = {
     funnel,

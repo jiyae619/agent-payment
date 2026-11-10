@@ -178,6 +178,14 @@ test("a final-sale item asks first", () => {
   assert.deepEqual(askRules(decide(mandate(), proposal({ final_sale: true }), ctx())), ["final_sale"]);
 });
 
+test("it asks before anything that can't be undone: a no-return kind of item, or no return policy found", () => {
+  // A purchase nobody can return is the one mistake a refund can't fix, so the shopper decides.
+  assert.deepEqual(askRules(decide(mandate(), proposal({ returns: "kind" }), ctx())), ["cant_undo"]);
+  assert.deepEqual(askRules(decide(mandate(), proposal({ returns: "not_found" }), ctx())), ["cant_undo"]);
+  assert.equal(decide(mandate(), proposal({ returns: "listing" }), ctx()).action, "capture");
+  assert.equal(decide(mandate(), proposal({ returns: "policy" }), ctx()).action, "capture");
+});
+
 test("the same item within 24 hours asks first, after that it doesn't", () => {
   // A retry or loop shouldn't buy the same shoes twice.
   const recent = [{ product_id: "shoe-1", at: "2026-11-07T01:00:00Z" }];

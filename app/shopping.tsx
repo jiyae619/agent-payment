@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from "react";
 import type { CatalogProduct } from "@/lib/catalog.ts";
 import type { CheckResult, Decision } from "@/lib/enforce.ts";
 import type { Policy } from "@/lib/policy.ts";
+import type { Returns } from "@/lib/check-core.ts";
 import { RATING_TEXT, REASON_TEXT, recordEntry, updateEntry, type DontBuyReason, type Outcome, type Rating } from "@/lib/history.ts";
 import type { FunnelStep } from "@/lib/shortlist.ts";
 
@@ -16,7 +17,7 @@ type Step = { step: string; text: string; count?: number };
 type ShelfItem = { id: string; title: string; price: number; store: string; image: string | null };
 type Shelf = { items: ShelfItem[]; kept?: string[]; dropped?: Record<string, string>; checked: Record<string, { ok: number; of: number }>; picked?: string };
 const NO_SHELF: Shelf = { items: [], checked: {} };
-type Option = { product: CatalogProduct; checks: CheckResult[]; policy: Policy | null; total: number; total_line: string | null };
+type Option = { product: CatalogProduct; checks: CheckResult[]; policy: Policy | null; returns?: Returns; total: number; total_line: string | null };
 type ShopResult = {
   outcome?: "choose" | "bought" | "released" | "ask" | "nothing_found" | "stopped";
   options?: Option[];
@@ -572,6 +573,12 @@ function Choose({ result, buying, onBuy, onEdit }: { result: ShopResult; buying:
                     </span>
                   ))}
                 </span>
+              )}
+              {o.returns && (
+                <p className={o.returns.evidence === "listing" || o.returns.evidence === "policy" ? "returns" : "returns ask"}>
+                  {o.returns.label}
+                  {o.returns.evidence !== "listing" && o.returns.evidence !== "policy" && ". It will ask you before paying."}
+                </p>
               )}
               {isRec && rec && <p className="why"><b>Why this one:</b> {rec.reason}{rec.by === "ai" && <span className="ai-tag">AI</span>}</p>}
               {o.checks.length > 0 && checked < o.checks.length && (

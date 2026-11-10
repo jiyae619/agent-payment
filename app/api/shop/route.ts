@@ -106,7 +106,7 @@ export async function POST(request: Request) {
         search_source: search.source,
         funnel,
         shortlist: checked.map((x) => ({ id: x.product.id, title: x.product.title, price: x.product.price, store: x.product.store })),
-        candidates: ordered.map((x) => ({ product: x.product, checks: x.checks, policy: x.policy, final_sale: x.final_sale })),
+        candidates: ordered.map((x) => ({ product: x.product, checks: x.checks, policy: x.policy, final_sale: x.final_sale, returns: x.returns })),
         recommended: { id: c.product.id, reason: chosen.reason, by: chosen.by },
       };
       return finish(200, {
