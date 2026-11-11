@@ -1,4 +1,4 @@
-// Loop 2 of the feedback plan (build-plan.md): turn the app's feedback log lines into work for the
+// Loop 2 of the feedback plan: turn the app's feedback log lines into work for the
 // operator. Plain code, no AI. Everything it produces is a draft for a person to review; nothing
 // here changes the app, the prompts or the evals by itself.
 //

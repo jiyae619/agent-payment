@@ -1,6 +1,6 @@
 // Store policies (return terms) for the product checker and the receipt. One interface,
 // findPolicy(store, topic), so the backend can grow from this small file to a search index over
-// every store (build-plan.md, section 6, row 1) without the checker or receipt changing.
+// every store without the checker or receipt changing.
 //
 // The text is the store's own words, never a summary: the checker must quote it, and the receipt
 // shows where it came from and when it was read. No policy found means "couldn't check".

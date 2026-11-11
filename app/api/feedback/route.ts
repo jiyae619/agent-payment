@@ -1,4 +1,4 @@
-// POST feedback → { ok }. Loop 2 of the feedback plan (build-plan.md): one log line per shopper
+// POST feedback → { ok }. Loop 2 of the feedback plan: one log line per shopper
 // answer, read later by scripts/feedback-to-cases.mts to draft eval cases and a to-do list.
 //
 //   { kind: "dont_buy_reason" | "rating", value, store, outcome, asked_because? }

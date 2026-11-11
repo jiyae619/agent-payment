@@ -1,6 +1,6 @@
 // The readback: what the assistant will do, one short line per rule, each tied to the shopper's
 // own words. Built from fixed templates only. No AI writes these sentences; the model's draft
-// only fills in values. Wording follows the word list in build-plan.md section 0.8: short,
+// only fills in values. Wording follows the project's word list: short,
 // plain, no repetition (the shopper's full request is shown once, above the list).
 
 import type { Mandate } from "./mandate.ts";

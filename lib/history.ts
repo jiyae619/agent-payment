@@ -1,7 +1,7 @@
 // The shopper's purchase history, kept in their own browser (the demo has no accounts, and the
 // server keeps nothing between visits). It feeds "From your past purchases" suggestions later,
 // and the shopper can clear it. Feedback here can only ever become a suggestion the shopper
-// taps to accept; it never changes a limit on its own (build-plan.md, "Feedback loop").
+// taps to accept; it never changes a limit on its own.
 
 export type Outcome = "bought" | "released" | "refused";
 export type DontBuyReason = "too_expensive" | "wrong_store" | "not_what_i_meant";

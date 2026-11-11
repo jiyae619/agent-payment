@@ -1,5 +1,5 @@
 // "From your past purchases": suggestions on the readback, built from the shopper's own history
-// (lib/history.ts). Plain code, no AI. The rule (build-plan.md, "Feedback loop"): a suggestion is
+// (lib/history.ts). Plain code, no AI. The rule: a suggestion is
 // only applied when the shopper taps it, it names the purchase it came from, and suggestions that
 // tighten a limit come before, and read stronger than, ones that loosen it.
 
