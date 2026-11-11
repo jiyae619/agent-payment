@@ -1,0 +1,337 @@
+<title>OKay-Pay Case Study</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a reading column for the story, widening to full width for the system diagram and the impact cards.
+   Same tokens as the walkthrough so the two pages read as one product. */
+:root {
+  --bg: #eceef1; --dot: #d5d8de; --sheet: #ffffff; --ink: #0b0c0e; --muted: #5a606b; --faint: #9aa0aa; --line: #e1e4e9; --soft: #f5f6f8;
+  --panel: rgba(255,255,255,.8); --action: #0b0c0e; --action-ink: #ffffff; --accent: #0070ba;
+  --ok: #157347; --ask: #a15c00; --no: #b42318; --ok-bg: #e6f4ec; --ask-bg: #fdf1df; --no-bg: #fbe8e6;
+  --d1a: #e7e2f6; --d1b: #f7f5fd; --d2a: #f8dcd8; --d2b: #fdf3f1; --d3a: #fbe9cc; --d3b: #fff8ec; --d4a: #dff2e7; --d4b: #f6fbf2;
+  --shadow: 0 1px 2px rgba(15,20,30,.06), 0 12px 40px rgba(15,20,30,.10);
+  --r-xl: 20px; --r-lg: 16px; --r-md: 12px; --r-sm: 8px;
+  --gap: 16px; --pad: 16px; --row: 8px 10px;
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1); --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --sans: "Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0f1012; --dot: #23252a; --sheet: #1a1b1e; --ink: #f1f2f4; --muted: #a0a6b0; --faint: #6b717b; --line: #2c2e33; --soft: #222428;
+  --panel: rgba(30,31,35,.84); --action: #ffffff; --action-ink: #0b0c0e; --accent: #6cb4ea;
+  --ok: #5ccf94; --ask: #f0a94a; --no: #f2867c; --ok-bg: #16301f; --ask-bg: #33260f; --no-bg: #36191a;
+  --d1a: #2a2540; --d1b: #1f1d27; --d2a: #3d1f1d; --d2b: #271d1c; --d3a: #3a2c12; --d3b: #262119; --d4a: #17352a; --d4b: #1d2520;
+  --shadow: 0 1px 2px rgba(0,0,0,.4), 0 12px 40px rgba(0,0,0,.45); color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #0f1012; --dot: #23252a; --sheet: #1a1b1e; --ink: #f1f2f4; --muted: #a0a6b0; --faint: #6b717b; --line: #2c2e33; --soft: #222428;
+  --panel: rgba(30,31,35,.84); --action: #ffffff; --action-ink: #0b0c0e; --accent: #6cb4ea;
+  --ok: #5ccf94; --ask: #f0a94a; --no: #f2867c; --ok-bg: #16301f; --ask-bg: #33260f; --no-bg: #36191a;
+  --d1a: #2a2540; --d1b: #1f1d27; --d2a: #3d1f1d; --d2b: #271d1c; --d3a: #3a2c12; --d3b: #262119; --d4a: #17352a; --d4b: #1d2520;
+  --shadow: 0 1px 2px rgba(0,0,0,.4), 0 12px 40px rgba(0,0,0,.45); color-scheme: dark; }
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font: 16px/1.55 var(--sans); background-image: radial-gradient(var(--dot) 1px, transparent 1.2px); background-size: 18px 18px; }
+.wrap { max-width: 1180px; margin: 0 auto; padding-block: 28px 72px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 56px; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+code { font: 12.5px var(--mono); }
+.top { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.brand { font-weight: 700; font-size: 20px; letter-spacing: -.01em; } .brand span { color: var(--accent); }
+.topr { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.navlink { font-weight: 700; font-size: 13.5px; color: var(--accent); text-decoration: none; }
+.navlink:hover { text-decoration: underline; }
+.tag { font: 500 10.5px var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 2px 8px; white-space: nowrap; }
+.tag.real { color: var(--ok); border-color: currentColor; } .tag.idea { color: var(--ask); border-color: currentColor; border-style: dashed; }
+.theme { display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--line); background: var(--sheet); color: var(--ink); border-radius: 999px; padding: 6px 12px 6px 8px; font: 700 13px var(--sans); cursor: pointer; transition: transform 160ms var(--ease-out); }
+.theme:active { transform: scale(0.97); }
+.theme .ti { width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid var(--ink); background: linear-gradient(90deg, var(--ink) 50%, transparent 50%); }
+.lab, .eyebrow { font: 500 11px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0; }
+
+.hero { display: grid; gap: 16px; max-width: 760px; }
+.hero h1 { font-size: clamp(32px, 4.6vw, 54px); line-height: 1.04; letter-spacing: -.025em; margin: 0; text-wrap: balance; }
+.hero p { margin: 0; font-size: 18px; color: var(--muted); max-width: 60ch; }
+.facts { display: flex; flex-wrap: wrap; gap: 8px; }
+.facts span { font-size: 13px; border: 1px solid var(--line); background: var(--sheet); border-radius: 999px; padding: 4px 12px; }
+
+.sec { display: grid; gap: 18px; }
+.sec > h2, .impact > h2 { margin: 0; font-size: clamp(24px, 2.6vw, 32px); line-height: 1.15; letter-spacing: -.01em; text-wrap: balance; max-width: 30ch; }
+.prose { display: grid; gap: 12px; max-width: 66ch; font-size: 16.5px; }
+.prose p { margin: 0; }
+.quote { font-size: 19px; line-height: 1.45; border-left: 3px solid var(--accent); padding: 2px 0 2px 16px; margin: 0; max-width: 60ch; }
+.quote small { display: block; font-size: 12.5px; color: var(--muted); margin-top: 6px; }
+
+.cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--gap); }
+.card { background: var(--sheet); border: 1px solid var(--line); border-radius: var(--r-lg); padding: var(--pad); display: grid; gap: 10px; align-content: start; min-width: 0; }
+.card h3 { margin: 0; font-size: 18px; line-height: 1.2; }
+.card p { margin: 0; font-size: 14.5px; color: var(--muted); }
+.card .eg { font-size: 13.5px; background: var(--soft); border-radius: var(--r-sm); padding: var(--row); color: var(--ink); }
+.vs { display: grid; grid-template-columns: 1fr 1fr; gap: var(--gap); }
+.vs > div { border-radius: var(--r-lg); padding: var(--pad); display: grid; gap: 8px; align-content: start; font-size: 14.5px; }
+.vs .them { background: var(--sheet); border: 1px solid var(--line); }
+.vs .us { background: var(--ink); color: var(--sheet); }
+.vs ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
+
+/* System flow */
+.flow { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; counter-reset: f; }
+.step { background: var(--sheet); border: 1px solid var(--line); border-radius: var(--r-md); padding: 12px; display: grid; gap: 6px; align-content: start; font-size: 13.5px; min-width: 0; position: relative; }
+.step b { font-size: 14.5px; }
+.step .who { justify-self: start; }
+.step code { font-size: 11.5px; color: var(--muted); overflow-wrap: anywhere; }
+.who { font: 500 10.5px var(--mono); letter-spacing: .05em; text-transform: uppercase; padding: 1px 6px; border-radius: 4px; white-space: nowrap; }
+.who.you { background: var(--ink); color: var(--sheet); } .who.ai { border: 1px dashed var(--muted); color: var(--muted); }
+.who.code { border: 1px solid var(--ink); color: var(--ink); } .who.pp { background: var(--accent); color: var(--sheet); }
+.legend { display: flex; flex-wrap: wrap; gap: 8px 16px; font-size: 13px; color: var(--muted); }
+.legend span { display: inline-flex; gap: 6px; align-items: center; }
+
+/* Real vs proposed */
+.tablew { overflow-x: auto; background: var(--sheet); border: 1px solid var(--line); border-radius: var(--r-lg); }
+table { border-collapse: collapse; width: 100%; min-width: 620px; font-size: 14px; }
+th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font: 500 11px var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+tr:last-child td { border-bottom: 0; }
+
+.next { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--gap); counter-reset: n; }
+.next div { background: var(--sheet); border: 1px solid var(--line); border-radius: var(--r-lg); padding: var(--pad); font-size: 14.5px; display: grid; gap: 6px; align-content: start; }
+.cta { display: flex; gap: 10px; flex-wrap: wrap; }
+.btn { display: inline-flex; align-items: center; border-radius: var(--r-md); padding: 12px 18px; font-weight: 700; text-decoration: none; background: var(--action); color: var(--action-ink); transition: transform 160ms var(--ease-out); }
+.btn:active { transform: scale(0.97); }
+.btn.ghost { background: var(--sheet); color: var(--ink); border: 1.5px solid var(--line); }
+
+/* Impact */
+.impact { display: grid; gap: 18px; }
+.impact > p { margin: 0; color: var(--muted); max-width: 70ch; }
+.who3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--gap); }
+.sh { background: var(--sheet); border: 1px solid var(--line); border-radius: var(--r-lg); padding: var(--pad); display: grid; gap: 12px; align-content: start; min-width: 0; }
+.sh h3 { margin: 0; font-size: 18px; }
+.yours { background: var(--soft); border-radius: var(--r-sm); padding: var(--row); font-size: 13.5px; display: grid; gap: 2px; }
+.yours .lab { font-size: 10.5px; }
+.sh .adds { margin: 0; padding-left: 18px; display: grid; gap: 4px; font-size: 13.5px; }
+.mt { display: grid; gap: 6px; }
+.m { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: baseline; font-size: 13px; padding: 6px 0; border-top: 1px solid var(--line); }
+.m small { display: block; color: var(--muted); font-size: 12px; }
+.acc { font: 500 10.5px var(--mono); letter-spacing: .03em; text-transform: uppercase; border-radius: 4px; padding: 1px 6px; white-space: nowrap; }
+.acc.us { background: var(--ok-bg); color: var(--ok); }
+.acc.pp { background: color-mix(in srgb, var(--accent) 14%, var(--sheet)); color: var(--accent); }
+.acc.mer { background: var(--ask-bg); color: var(--ask); }
+.take { font-size: 13px; border-left: 3px solid var(--ask); padding: 4px 0 4px 10px; color: var(--ink); }
+.access { background: var(--sheet); border: 1px solid var(--line); border-radius: var(--r-lg); padding: var(--pad); display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; font-size: 13.5px; }
+.access h4 { margin: 0 0 6px; font-size: 14px; display: flex; gap: 8px; align-items: center; }
+.access ul { margin: 0; padding-left: 18px; display: grid; gap: 3px; }
+
+
+
+/* Evidence: stat tiles. Values in text tokens; the label says what it counts. */
+.stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--gap); }
+.stat { background: var(--sheet); border: 1px solid var(--line); border-radius: var(--r-lg); padding: var(--pad); display: grid; gap: 4px; align-content: start; min-width: 0; }
+.stat .l { font: 500 11px var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.stat .n { font: 500 30px/1.1 var(--mono); font-variant-numeric: tabular-nums; color: var(--ink); letter-spacing: -.02em; }
+.stat .s { font-size: 13px; color: var(--muted); }
+.stat .s b { color: var(--ink); font-weight: 700; }
+.evhead { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.evhead h3 { margin: 0; font-size: 18px; }
+@media (max-width: 960px) { .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 420px) { .stats { grid-template-columns: 1fr; } }
+
+@media (max-width: 960px) {
+  .cards, .next, .who3, .access { grid-template-columns: 1fr; }
+  .flow { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 560px) {
+  .vs, .flow { grid-template-columns: 1fr; }
+  .wrap { gap: 44px; }
+}
+@media (prefers-reduced-motion: reduce) { .btn, .theme { transition: none; } .btn:active, .theme:active { transform: none; } }
+</style>
+
+<div class="wrap">
+  <div class="top"><span class="brand">OKay<span>-</span>Pay</span>
+    <div class="topr"><a class="navlink" href="okay-pay.html">← Walkthrough</a><span class="tag">Case study · PayPal AI Hackathon 2026</span>
+      <button type="button" class="theme" id="theme" aria-label="Switch color theme"><span class="ti" aria-hidden="true"></span><span id="themeLabel">Dark</span></button></div></div>
+
+  <header class="hero">
+    <p class="eyebrow">Case study</p>
+    <h1>An AI shopping agent that shows where it guessed, and earns the right to guess less.</h1>
+    <p>OKay-Pay sits between a shopper, their AI agent, PayPal and the store. The agent suggests. Plain code decides. PayPal holds the money until every rule passes, and the shopper always has the last word.</p>
+    <div class="facts"><span>Built on PayPal Orders v2 and Vault</span><span>Real store listings via Channel3</span><span>Sandbox: no real money moves</span></div>
+  </header>
+
+  <section class="sec">
+    <p class="eyebrow">01 · The problem</p>
+    <h2>People can't see what a shopping agent is buying, or how it read their words.</h2>
+    <div class="prose">
+      <p>An agent turns a sentence into a purchase. Between the two, it interprets: what "nothing too flashy" means, which store is fine, whether a listing really says "size 8". Today the shopper sees none of that. They approve a dollar amount and hope.</p>
+      <p>Two more gaps follow. Store pages can carry text written to steer agents, and an approval that only checks the total can't tell a running shoe from a $100 gift card under the same limit. And once money moves, nobody can tell whether a bad purchase was the listing's fault, the agent's misreading, or the shopper changing their mind.</p>
+    </div>
+    <blockquote class="quote">Humans aren't shown what agents are shopping for, or how they interpret the prompt.<small>The problem statement this project started from</small></blockquote>
+  </section>
+
+  <section class="sec">
+    <p class="eyebrow">02 · What already exists</p>
+    <h2>Most agent payments treat approval as a one-time contract about money.</h2>
+    <div class="vs">
+      <div class="them"><b>The common approach</b><ul><li>Set limits up front and sign them.</li><li>A gate answers buy, ask or block.</li><li>Keep signed receipts for disputes.</li></ul><p style="margin:0;color:var(--muted);font-size:13.5px">It controls how much is spent. It doesn't show what the agent understood.</p></div>
+      <div class="us"><b>OKay-Pay's approach</b><ul><li>Approval is about meaning: the agent asks only where it guessed.</li><li>Trust is earned from the shopper's own history, and a refund takes it back.</li><li>Every rule must point at the shopper's words, so a store page can't write one.</li></ul></div>
+    </div>
+  </section>
+
+  <section class="sec">
+    <p class="eyebrow">03 · The approach</p>
+    <h2>One request, one tap, and a question only when it can't be undone.</h2>
+    <div class="cards">
+      <article class="card"><span class="tag idea" style="justify-self:start">Where it guessed</span><h3>Show what was guessed, ask nothing extra</h3><p>Facts like "size 8" become rules as written. Words the agent had to interpret are marked and pre-filled with its best guess. The shopper picks how much to check: <b>Check guesses</b>, <b>Allow guesses</b> or <b>Auto-shop</b>.</p><div class="eg">"nothing too flashy" shows as a chip: black, grey or navy. One tap approves; tap the chip only to change it.</div></article>
+      <article class="card"><span class="tag idea" style="justify-self:start">Earned trust</span><h3>Ask less over time, and only with consent</h3><p>Each OK, refund and "not what I meant" goes into history. History can only suggest. The shopper accepts each loosening with a tap; a refund tightens things right away.</p><div class="eg">6 of 6 unscented dish soap orders: "Use Auto-shop, so I fill in 'the usual' myself?" A misread refund drops a category back one level right away.</div></article>
+      <article class="card"><span class="tag real" style="justify-self:start">Store pages can't write rules</span><h3>Only the shopper's words make rules</h3><p>Every rule records the words it came from. Text on a product page points at no words of the shopper's, so it can't add an item, a rule or a guess.</p><div class="eg">A hidden note asks agents to buy a $100 gift card. No PayPal call is made.</div></article>
+    </div>
+    <div class="prose">
+      <p><b>The agent picks, the shopper keeps the last word.</b> It ranks by the shopper's own words first, proven by quotes from the listing, then by price. "For trails mostly" means the trail shoe, unless a cheaper shoe is also proven to suit trails. PayPal holds the money, code checks every rule, and it charges. No timer, no extra tap: the receipt appears on its own. The shopper can use ‹ › to see the options it didn't buy, each with a plain reason, and switch to one. Switching refunds the first charge in full and buys the other.</p>
+      <p><b>One question survives every level: can it be undone?</b> Final-sale items, personalized items, and items whose return policy couldn't be found are asked about before paying. The evidence is labeled: "stated in the listing", "found on the store's policy page", or "not found, treated as final sale, please check". A must-have the listing doesn't prove, on an item that can be returned, doesn't stop the purchase; it's stated on the item card and in the PayPal order's item description.</p>
+      <p><b>Hard rules nobody can change mid-purchase:</b> the spending limit, "never gift cards or money", and any store the shopper named, to use or to avoid. Once a purchase starts, no new instruction can steer it, from the shopper or from a page. Cancel is always there and voids the hold.</p>
+    </div>
+  </section>
+
+  <section class="sec">
+    <p class="eyebrow">04 · How the money moves</p>
+    <h2>The AI never touches the money. Code decides, PayPal moves it.</h2>
+    <div class="legend"><span><span class="who you">You</span> decide</span><span><span class="who ai">AI</span> suggests</span><span><span class="who code">Code</span> enforces</span><span><span class="who pp">PayPal</span> moves money</span></div>
+    <div class="flow">
+      <div class="step"><span class="who you">You</span><b>Ask</b><span>Write the request in plain words.</span></div>
+      <div class="step"><span class="who ai">AI</span><b>Plan</b><span>Draft rules, each tied to the words it came from. Code marks guesses and seals the plan.</span></div>
+      <div class="step"><span class="who pp">PayPal</span><b>Approve</b><span>Save the PayPal account. No money moves.</span><code>POST /v3/vault/setup-tokens<br>POST /v3/vault/payment-tokens</code></div>
+      <div class="step"><span class="who code">Code</span><b>Pick</b><span>Rank by the shopper's words, then price. No choose step.</span></div>
+      <div class="step"><span class="who pp">PayPal</span><b>Hold</b><span>Authorize the amount on the saved account.</span><code>POST /v2/checkout/orders<br>intent: AUTHORIZE</code></div>
+      <div class="step"><span class="who code">Code</span><b>Decide</b><span>Check every rule, then capture and show the receipt. Asks only if it can't be undone.</span><code>…/authorizations/{id}/capture<br>…/authorizations/{id}/void</code></div>
+    </div>
+    <div class="prose"><p>After a purchase, a refund is one tap: <code>POST /v2/payments/captures/{id}/refund</code> returns the full charge to the PayPal account that paid, and the sealed receipt can refund only that one charge. If a rule failed, there was never a charge to refund; the hold was voided.</p></div>
+  </section>
+
+  <section class="impact" id="impact">
+    <p class="eyebrow">05 · Impact</p>
+    <h2>Why trust in agent payments is worth money</h2>
+    <p>Each party starts from one hypothesis about what trust is worth to them. Under each: what OKay-Pay adds, and the numbers that would show it. Each number says who can measure it, because most of the real outcomes sit in PayPal's or the merchant's data, not ours.</p>
+    <div class="who3">
+      <article class="sh">
+        <h3>The shopper</h3>
+        <div class="yours"><span class="lab">Starting hypothesis</span><span>"more control over agentic payments"</span></div>
+        <ul class="adds">
+          <li>One approval per request; a question only when a purchase can't be undone.</li>
+          <li>No money moves until every rule passes; a failed rule releases the hold.</li>
+          <li>One-tap refund, and the refund teaches OKay-Pay what it misread.</li>
+          <li>The receipt shows the options it didn't buy; switching refunds the first charge in full.</li>
+        </ul>
+        <div class="mt">
+          <div class="m"><span>Taps per purchase<small>Target: 1, plus 1 only when it can't be undone</small></span><span class="acc us">we can measure</span></div>
+          <div class="m"><span>Refunds marked "not what I meant"<small>Our misread rate</small></span><span class="acc us">we can measure</span></div>
+          <div class="m"><span>Holds released by a failed rule<small>Money that never moved by mistake</small></span><span class="acc us">we can measure</span></div>
+          <div class="m"><span>Categories moved to Auto-shop<small>Trust the shopper chose to give</small></span><span class="acc us">we can measure</span></div>
+        </div>
+      </article>
+      <article class="sh">
+        <h3>PayPal</h3>
+        <div class="yours"><span class="lab">Starting hypothesis</span><span>"more control over fraud payments from agents"</span></div>
+        <ul class="adds">
+          <li>Every agent payment carries proof the account holder approved these exact rules.</li>
+          <li>Instructions hidden in store pages never reach PayPal. The gift card got no API call at all.</li>
+          <li>Authorize first, capture only after code checks. Wrong buys end as a void, not a refund or dispute.</li>
+          <li>Refund reasons separate "agent misread" from "parcel lost".</li>
+        </ul>
+        <div class="mt">
+          <div class="m"><span>Agent payments with consent proof<small>Share of orders with a sealed approval</small></span><span class="acc us">we can measure</span></div>
+          <div class="m"><span>Hijack attempts blocked before PayPal<small>Gift cards, money transfers, page instructions</small></span><span class="acc us">we can measure</span></div>
+          <div class="m"><span>Voids vs captures on agent orders<small>Our sandbox only; network-wide is PayPal's</small></span><span class="acc us">our sandbox only</span></div>
+          <div class="m"><span>Unauthorized-transaction claims, fraud loss<small>On agent-initiated payments</small></span><span class="acc pp">PayPal only</span></div>
+        </div>
+      </article>
+      <article class="sh">
+        <h3>The merchant</h3>
+        <div class="yours"><span class="lab">Starting hypothesis</span><span>"more transparency over agent reasoning?"</span></div>
+        <ul class="adds">
+          <li>With each order: the shopper's own words next to the listing text they matched.</li>
+          <li>A record that the shopper approved, and what they approved.</li>
+          <li>Refund reasons that say whether the listing or the agent was wrong.</li>
+        </ul>
+        <p class="take"><b>Open question:</b> a merchant may care less about the agent's reasoning itself and more about proof. Proof the shopper really agreed, and proof the listing matched their words. That proof is what helps with "I didn't authorize this" and "not as described" claims. This still needs checking with real merchants.</p>
+        <div class="mt">
+          <div class="m"><span>Agent orders that arrive with context<small>Needs the proposed order fields</small></span><span class="acc us">we can measure</span></div>
+          <div class="m"><span>Return rate on agent orders</span><span class="acc mer">merchant only</span></div>
+          <div class="m"><span>"Not as described" disputes on agent orders</span><span class="acc pp">PayPal or merchant</span></div>
+          <div class="m"><span>Sales from agent shoppers<small>Conversion of agent traffic</small></span><span class="acc mer">merchant only</span></div>
+        </div>
+      </article>
+    </div>
+    <div class="access">
+      <div><h4><span class="acc us">we can measure</span></h4><ul><li>Questions per purchase</li><li>Released holds, voids, captures, refunds in our sandbox</li><li>Refund reasons</li><li>Blocked hijack attempts</li><li>Share of orders with consent proof</li></ul></div>
+      <div><h4><span class="acc pp">PayPal only</span></h4><ul><li>Fraud loss and unauthorized-transaction claims</li><li>Dispute and chargeback rates</li><li>Risk scores on agent payments</li><li>We show the mechanism and our sandbox counts, and name these as what PayPal would track.</li></ul></div>
+      <div><h4><span class="acc mer">merchant only</span></h4><ul><li>Return rates</li><li>Sales from agent shoppers</li><li>Support load from agent orders</li><li>We say which merchant numbers should move, without quoting figures we can't see.</li></ul></div>
+    </div>
+  </section>
+
+  <section class="sec" id="evidence">
+    <p class="eyebrow">06 · Evidence</p>
+    <h2>What a month of sandbox purchases looks like.</h2>
+    <div class="evhead"><h3>Sandbox dashboard</h3><span class="tag idea">illustrative sandbox figures</span></div>
+    <p style="margin:0;max-width:66ch;font-size:16px">These figures show the shape of the numbers OKay-Pay records for every run. They are illustrative sandbox data, not results from real shoppers; the counts we could measure on real traffic are the same ones listed under Impact.</p>
+    <div class="stats">
+      <div class="stat"><span class="l">Sandbox purchases</span><span class="n">240</span><span class="s">over 30 days · <b>221</b> bought, <b>19</b> released</span></div>
+      <div class="stat"><span class="l">Taps per purchase</span><span class="n">1.1</span><span class="s">median <b>1</b>; the extra tap is "can't be undone"</span></div>
+      <div class="stat"><span class="l">Orders with consent proof</span><span class="n">100%</span><span class="s"><b>240</b> of 240 carry a proof id in custom_id</span></div>
+      <div class="stat"><span class="l">Hijacks stopped before PayPal</span><span class="n">52</span><span class="s"><b>0</b> reached a PayPal API call</span></div>
+      <div class="stat"><span class="l">Released, nothing charged</span><span class="n">19</span><span class="s"><b>13</b> hard rule, <b>6</b> shopper said "Don't buy"</span></div>
+      <div class="stat"><span class="l">"Can't be undone" questions</span><span class="n">23</span><span class="s"><b>17</b> yes, <b>6</b> no</span></div>
+      <div class="stat"><span class="l">Refunds</span><span class="n">11</span><span class="s"><b>5</b> switched option, <b>4</b> not what I meant, <b>2</b> never arrived</span></div>
+      <div class="stat"><span class="l">Moved to Auto-shop</span><span class="n">3</span><span class="s">categories, each accepted by the shopper</span></div>
+    </div>
+    <div class="evhead"><h3>Model evals</h3><span class="tag real">real results</span></div>
+    <p style="margin:0;max-width:66ch;font-size:16px">Each AI step was chosen by an eval on synthetic cases. A case counts only if all 3 runs pass (pass^3), and a model needs zero critical mistakes, meaning nothing that could spend money against the shopper's wishes. Full rounds in the repo's <code>eval/LOG.md</code>.</p>
+    <div class="stats">
+      <div class="stat"><span class="l">Drafter</span><span class="n">34/39</span><span class="s">pass^3 · <b>0</b> critical · Claude Sonnet 5</span></div>
+      <div class="stat"><span class="l">Product checker</span><span class="n">34/37</span><span class="s">pass^3 · <b>0</b> critical · Claude Sonnet 5</span></div>
+      <div class="stat"><span class="l">Pick step</span><span class="n">19/19</span><span class="s">read by hand · <b>0</b> false claims · Claude Haiku 5.5</span></div>
+      <div class="stat"><span class="l">Tests</span><span class="n">178</span><span class="s">unit, invariant and scorer tests, all passing</span></div>
+    </div>
+  </section>
+
+  <section class="sec">
+    <p class="eyebrow">07 · Real today, and proposed</p>
+    <h2>What the sandbox app does now, and what OKay-Pay adds.</h2>
+    <div class="tablew"><table>
+      <thead><tr><th>Piece</th><th>Status</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td>Read-back of rules, each tied to the shopper's words</td><td><span class="tag real">real</span></td><td>Defaults the app adds are shown, not hidden.</td></tr>
+        <tr><td>Must-haves checked against quotes from the listing</td><td><span class="tag real">real</span></td><td>A claim with no real quote counts as "couldn't check".</td></tr>
+        <tr><td>Hold, then capture or void (Orders v2 AUTHORIZE)</td><td><span class="tag real">real</span></td><td>Saved PayPal account through Vault.</td></tr>
+        <tr><td>One-tap refund from the receipt</td><td><span class="tag real">real</span></td><td>Full refund; added to the sealed proof.</td></tr>
+        <tr><td>Gift cards and page instructions blocked</td><td><span class="tag real">real</span></td><td>Blocked before any PayPal call.</td></tr>
+        <tr><td>Marking guesses in the request</td><td><span class="tag idea">proposed</span></td><td>Needs one new field in the AI's draft.</td></tr>
+        <tr><td>Earned trust suggestions</td><td><span class="tag idea">proposed</span></td><td>History is already kept in the shopper's browser; suggestions are new.</td></tr>
+        <tr><td>Agent picks and pays; the receipt shows the other options with ‹ › and a switch</td><td><span class="tag idea">proposed</span></td><td>Today the shopper chooses from up to 3 options.</td></tr>
+        <tr><td>Three levels: Check guesses, Allow guesses, Auto-shop</td><td><span class="tag idea">proposed</span></td><td>Picked with each request.</td></tr>
+        <tr><td>Return-policy evidence labels and the "can't be undone" question</td><td><span class="tag idea">proposed</span></td><td>Today a must-have without a quote releases the hold.</td></tr>
+        <tr><td>Proof ID in the order's custom_id, with a merchant verify view</td><td><span class="tag idea">proposed</span></td><td>The shopper's raw request stays encrypted and is never shown to merchants.</td></tr>
+        <tr><td>Context sent to the merchant and signals for PayPal</td><td><span class="tag idea">proposed</span></td><td>Today the order carries only the item name and amount.</td></tr>
+      </tbody></table></div>
+  </section>
+
+  <section class="sec">
+    <p class="eyebrow">08 · Next</p>
+    <h2>What would make this more than a demo.</h2>
+    <div class="next">
+      <div><b>Talk to merchants</b><span>Test the guess that they want proof of consent more than the agent's reasoning.</span></div>
+      <div><b>Measure in the sandbox</b><span>Questions per purchase, released holds, refund reasons and blocked hijacks, over repeated runs.</span></div>
+      <div><b>Ask PayPal what to send</b><span>Which signals would actually help with disputes and fraud, and where they belong in the order.</span></div>
+    </div>
+    <div class="cta"><a class="btn" href="okay-pay.html">Open the walkthrough</a></div>
+  </section>
+</div>
+
+<script>
+(() => {
+  const root = document.documentElement, btn = document.getElementById("theme"), label = document.getElementById("themeLabel");
+  const isDark = () => root.dataset.theme ? root.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+  const show = () => { label.textContent = isDark() ? "Light" : "Dark"; btn.setAttribute("aria-label", isDark() ? "Switch to light mode" : "Switch to dark mode"); };
+  try { const saved = localStorage.getItem("okp-theme"); if (saved === "dark" || saved === "light") root.dataset.theme = saved; } catch (e) {}
+  btn.onclick = () => { const next = isDark() ? "light" : "dark"; root.dataset.theme = next; try { localStorage.setItem("okp-theme", next); } catch (e) {} show(); };
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", show);
+  show();
+})();
+</script>

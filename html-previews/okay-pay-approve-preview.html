@@ -1,0 +1,151 @@
+<title>OKay-Pay Approval Preview</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: two candidate approval screens side by side, same request, same rules. Below each, what happens after one tap. */
+:root {
+  --bg: #eceef1; --dot: #d5d8de; --sheet: #ffffff; --ink: #0b0c0e; --muted: #5a606b; --faint: #9aa0aa; --line: #e1e4e9; --soft: #f5f6f8;
+  --panel: rgba(255,255,255,.8); --action: #0b0c0e; --action-ink: #ffffff; --accent: #0070ba;
+  --ok: #157347; --ask: #a15c00; --no: #b42318; --ok-bg: #e6f4ec; --ask-bg: #fdf1df; --no-bg: #fbe8e6;
+  --d1a: #e7e2f6; --d1b: #f7f5fd; --d2a: #f8dcd8; --d2b: #fdf3f1; --d3a: #fbe9cc; --d3b: #fff8ec; --d4a: #dff2e7; --d4b: #f6fbf2;
+  --shadow: 0 1px 2px rgba(15,20,30,.06), 0 12px 40px rgba(15,20,30,.10);
+  --r-xl: 20px; --r-lg: 16px; --r-md: 12px; --r-sm: 8px;
+  --gap: 16px; --pad: 16px; --row: 8px 10px;
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1); --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --sans: "Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0f1012; --dot: #23252a; --sheet: #1a1b1e; --ink: #f1f2f4; --muted: #a0a6b0; --faint: #6b717b; --line: #2c2e33; --soft: #222428;
+  --panel: rgba(30,31,35,.84); --action: #ffffff; --action-ink: #0b0c0e; --accent: #6cb4ea;
+  --ok: #5ccf94; --ask: #f0a94a; --no: #f2867c; --ok-bg: #16301f; --ask-bg: #33260f; --no-bg: #36191a;
+  --d1a: #2a2540; --d1b: #1f1d27; --d2a: #3d1f1d; --d2b: #271d1c; --d3a: #3a2c12; --d3b: #262119; --d4a: #17352a; --d4b: #1d2520;
+  --shadow: 0 1px 2px rgba(0,0,0,.4), 0 12px 40px rgba(0,0,0,.45); color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #0f1012; --dot: #23252a; --sheet: #1a1b1e; --ink: #f1f2f4; --muted: #a0a6b0; --faint: #6b717b; --line: #2c2e33; --soft: #222428;
+  --panel: rgba(30,31,35,.84); --action: #ffffff; --action-ink: #0b0c0e; --accent: #6cb4ea;
+  --ok: #5ccf94; --ask: #f0a94a; --no: #f2867c; --ok-bg: #16301f; --ask-bg: #33260f; --no-bg: #36191a;
+  --d1a: #2a2540; --d1b: #1f1d27; --d2a: #3d1f1d; --d2b: #271d1c; --d3a: #3a2c12; --d3b: #262119; --d4a: #17352a; --d4b: #1d2520;
+  --shadow: 0 1px 2px rgba(0,0,0,.4), 0 12px 40px rgba(0,0,0,.45); color-scheme: dark; }
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font: 16px/1.45 var(--sans); background-image: radial-gradient(var(--dot) 1px, transparent 1.2px); background-size: 18px 18px; }
+.wrap { max-width: 1040px; margin: 0 auto; padding-block: 28px 56px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 28px; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.top { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.brand { font-weight: 700; font-size: 20px; } .brand span { color: var(--accent); }
+.tag { font: 500 10.5px var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 2px 8px; }
+h1 { margin: 0 0 8px; font-size: clamp(26px, 3.2vw, 36px); letter-spacing: -.02em; line-height: 1.1; text-wrap: balance; }
+.lede { margin: 0; color: var(--muted); max-width: 64ch; }
+.pair { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; align-items: start; }
+.col { display: grid; gap: 12px; min-width: 0; }
+.colhead b { font: 500 11px var(--mono); letter-spacing: .08em; text-transform: uppercase; display: block; }
+.colhead span { font-size: 13.5px; color: var(--muted); }
+.phone { background: var(--sheet); border: 1px solid var(--line); border-radius: var(--r-xl); box-shadow: var(--shadow); padding: 18px; display: grid; gap: 14px; }
+.ph-top { display: flex; justify-content: space-between; align-items: center; } .ph-top b span { color: var(--accent); }
+.lab { font: 500 11px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0; }
+.req { background: var(--soft); border-radius: var(--r-md); padding: 12px 14px; font-size: 15.5px; line-height: 1.9; }
+.w-fact { border-bottom: 2px solid var(--ink); }
+.chip { display: inline-flex; align-items: center; gap: 4px; font: inherit; font-size: 14.5px; line-height: 1.3; border: 0; cursor: pointer; padding: 1px 7px; border-radius: 6px;
+  background: var(--ask-bg); color: var(--ink); border-bottom: 2px dashed var(--ask); transition: transform 160ms var(--ease-out); }
+.chip:active { transform: scale(0.97); }
+.chip .cv { font-weight: 700; } .chip .car { font-size: 11px; color: var(--ask); }
+.sum { display: grid; gap: 8px; font-size: 14.5px; }
+.line { display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 10px; align-items: baseline; }
+.mk { width: 16px; height: 16px; border-radius: 50%; display: inline-grid; place-items: center; font: 700 11px var(--mono); }
+.mk.pass { background: var(--ok-bg); color: var(--ok); } .mk.ask { background: var(--ask-bg); color: var(--ask); border-radius: 4px; } .mk.fail { background: var(--no-bg); color: var(--no); border-radius: 4px; }
+.small { font-size: 12.5px; color: var(--muted); margin: 0; }
+.btn { border: 0; border-radius: var(--r-md); padding: 13px 14px; font: 700 15px var(--sans); cursor: pointer; background: var(--action); color: var(--action-ink); width: 100%; transition: transform 160ms var(--ease-out); }
+.btn:active { transform: scale(0.97); }
+.btn.done { background: var(--ok-bg); color: var(--ok); cursor: default; }
+details { border-top: 1px solid var(--line); padding-top: 10px; }
+summary { cursor: pointer; font-size: 13.5px; font-weight: 700; color: var(--accent); list-style: none; display: flex; align-items: center; gap: 6px; }
+summary::-webkit-details-marker { display: none; }
+summary::before { content: "›"; display: inline-block; transition: transform 200ms var(--ease-out); }
+details[open] summary::before { transform: rotate(90deg); }
+details .sum { margin-top: 10px; }
+.badge { display: inline-flex; gap: 6px; align-items: center; font-size: 13px; background: var(--ask-bg); border-radius: 999px; padding: 3px 10px; justify-self: start; }
+.after { display: grid; gap: 6px; font-size: 13.5px; background: var(--sheet); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 14px 16px; }
+.after ol { margin: 0; padding-left: 18px; display: grid; gap: 4px; color: var(--muted); }
+.after b { color: var(--ink); }
+.score { display: flex; gap: 8px; flex-wrap: wrap; }
+.score span { font: 500 11.5px var(--mono); border: 1px solid var(--line); border-radius: 999px; padding: 2px 9px; background: var(--sheet); }
+.menu { position: absolute; z-index: 5; background: var(--sheet); border: 1px solid var(--line); border-radius: var(--r-md); box-shadow: var(--shadow); padding: 6px; display: grid; gap: 2px; min-width: 210px;
+  transform-origin: top left; animation: menu 160ms var(--ease-out) both; }
+@keyframes menu { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: none; } }
+.menu button { text-align: left; border: 0; background: none; font: 14px var(--sans); padding: 8px 10px; border-radius: var(--r-sm); cursor: pointer; color: var(--ink); }
+.menu button[aria-checked="true"] { background: var(--soft); font-weight: 700; }
+@media (hover: hover) and (pointer: fine) { .menu button:hover { background: var(--soft); } }
+@media (max-width: 760px) { .pair { grid-template-columns: 1fr; } }
+@media (prefers-reduced-motion: reduce) { .menu { animation: none; } .btn, .chip { transition: none; } }
+</style>
+
+<div class="wrap">
+  <div class="top"><span class="brand">OKay<span>-</span>Pay</span><span class="tag">Preview for Q2 · approval screen</span></div>
+  <section>
+    <h1>One screen before any money. Which reads better?</h1>
+    <p class="lede">Same request, same rules. Read-back, the guess and the safe default are merged into one screen, and one tap approves all of it. Guesses come pre-filled with the agent's best answer; tap one only to change it.</p>
+  </section>
+
+  <div class="pair">
+    <div class="col">
+      <div class="colhead"><b>A · Your words, editable in place</b><span>The request itself is the approval. Guesses are chips inside the sentence.</span></div>
+      <div class="phone">
+        <div class="ph-top"><b>OKay<span>-</span>Pay</b><span class="tag">Day 1</span></div>
+        <p class="lab">Here's how I read you</p>
+        <div class="req"><span class="w-fact">Running shoes</span>, <span class="w-fact">size 8</span>, <button type="button" class="chip" data-g="color">nothing too flashy: <span class="cv" data-v="color">black, grey or navy</span><span class="car">▾</span></button>, <span class="w-fact">under $120</span>. For trails mostly.</div>
+        <div class="sum">
+          <div class="line"><span class="mk pass">✓</span><span>Charges only if every rule checks out against the store's own listing.</span></div>
+          <div class="line"><span class="mk ask">!</span><span>Asks you only if it can't be undone, like a final-sale item.</span></div>
+          <div class="line"><span class="mk fail">✕</span><span>Never gift cards, prepaid cards, crypto or money transfers.</span></div>
+        </div>
+        <p class="small">Yellow = my guess. Tap it to change. "For trails mostly" only guides the search.</p>
+        <button type="button" class="btn" data-approve>Approve up to $120 with PayPal</button>
+      </div>
+      <div class="after"><b>After one tap</b><ol><li>It searches, checks every listing, picks the best match.</li><li>PayPal holds $54.99, code checks the rules, then charges.</li><li>You get a receipt with what was checked, and a one-tap refund.</li></ol><div class="score"><span>1 tap</span><span>1 guess visible, 0 required</span></div></div>
+    </div>
+
+    <div class="col">
+      <div class="colhead"><b>B · One-line summary, details folded</b><span>A plain summary on top. The guess is flagged; the full rule list is one tap away.</span></div>
+      <div class="phone">
+        <div class="ph-top"><b>OKay<span>-</span>Pay</b><span class="tag">Day 1</span></div>
+        <p class="lab">I'll buy</p>
+        <p style="margin:0;font-size:18px;line-height:1.35"><b>Size 8 running shoes, under $120</b>, in <button type="button" class="chip" data-g="color"><span class="cv" data-v="color">black, grey or navy</span><span class="car">▾</span></button>, leaning toward trail shoes.</p>
+        <span class="badge"><span class="mk ask">!</span>1 guess: "nothing too flashy"</span>
+        <details><summary>See all 6 rules</summary>
+          <div class="sum">
+            <div class="line"><span class="mk pass">✓</span><span>Running shoes only <span class="small">· your words</span></span></div>
+            <div class="line"><span class="mk pass">✓</span><span>Size 8 <span class="small">· your words</span></span></div>
+            <div class="line"><span class="mk pass">✓</span><span>Up to $120 <span class="small">· your words</span></span></div>
+            <div class="line"><span class="mk ask">!</span><span>Color: <span data-v="color">black, grey or navy</span> <span class="small">· my guess</span></span></div>
+            <div class="line"><span class="mk ask">!</span><span>Asks you if it can't be undone <span class="small">· safe default</span></span></div>
+            <div class="line"><span class="mk fail">✕</span><span>Never gift cards or money <span class="small">· always</span></span></div>
+          </div></details>
+        <button type="button" class="btn" data-approve>Approve up to $120 with PayPal</button>
+      </div>
+      <div class="after"><b>After one tap</b><ol><li>It searches, checks every listing, picks the best match.</li><li>PayPal holds $54.99, code checks the rules, then charges.</li><li>You get a receipt with what was checked, and a one-tap refund.</li></ol><div class="score"><span>1 tap</span><span>rules hidden until opened</span></div></div>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const OPTS = ["black, grey or navy", "no neon or bright colors", "any color"];
+  let val = OPTS[0], open = null;
+  const sync = () => document.querySelectorAll('[data-v="color"]').forEach((e) => { e.textContent = val; });
+  const close = () => { if (open) { open.remove(); open = null; } };
+  document.querySelectorAll(".chip").forEach((chip) => chip.addEventListener("click", (ev) => {
+    ev.stopPropagation(); const was = open && open.dataset.for === chip.dataset.g + chip.closest(".col").querySelector(".colhead b").textContent; close(); if (was) return;
+    const m = document.createElement("div"); m.className = "menu"; m.setAttribute("role", "menu"); m.dataset.for = chip.dataset.g + chip.closest(".col").querySelector(".colhead b").textContent;
+    m.innerHTML = '<span class="small" style="padding:6px 10px 4px">"nothing too flashy" means</span>' + OPTS.map((o) => `<button type="button" role="menuitemradio" aria-checked="${o === val}">${o}</button>`).join("");
+    const r = chip.getBoundingClientRect(); m.style.left = (r.left + scrollX) + "px"; m.style.top = (r.bottom + scrollY + 6) + "px";
+    document.body.appendChild(m); open = m;
+    m.querySelectorAll("button").forEach((b) => b.onclick = () => { val = b.textContent; sync(); close(); });
+  }));
+  document.addEventListener("click", close);
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") close(); });
+  document.querySelectorAll("[data-approve]").forEach((b) => b.onclick = () => { b.textContent = "Approved. Shopping now…"; b.classList.add("done"); });
+})();
+</script>
