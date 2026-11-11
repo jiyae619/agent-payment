@@ -360,3 +360,32 @@ details.more ol { margin: 10px 0 0; padding-left: 18px; font-size: 14px; display
   .dcard { min-width: 0; padding: 12px; }
   .dcard b { font-size: 15px; }
 }
+
+/* The shopper's screen: one phone-like surface, as in the Glass Box and Okay-Pay previews.
+   Sections inside it sit flat; the option cards lift off it. */
+.shopper { background: var(--sheet); border: 1px solid var(--line); border-radius: 22px; box-shadow: var(--shadow); padding: 18px; gap: 14px; align-content: start; min-height: 560px; }
+.ph-top { display: flex; justify-content: space-between; align-items: center; }
+.ph-top b { font-size: 16px; }
+.shopper .sheet { background: transparent; box-shadow: none; padding: 0; border-radius: 0; }
+.shopper .sheet + .sheet { border-top: 1px solid var(--line); padding-top: 14px; }
+.shopper .approved-line { background: var(--ok-bg); color: var(--ink); border-radius: 10px; padding: 8px 12px; font-size: 13.5px; }
+.shopper .request { background: var(--soft); border: 0; border-radius: 12px; }
+.shopper .quote { background: var(--soft); border-radius: 12px; }
+.shopper .btn { border-radius: 12px; }
+.shopper .option { background: var(--sheet); border-radius: 16px; padding: 14px; box-shadow: inset 0 0 0 1px var(--line), var(--shadow); }
+.shopper .option.rec { box-shadow: inset 0 0 0 2px var(--ink), var(--shadow); }
+.shopper .option.off { box-shadow: inset 0 0 0 1px var(--line); opacity: .8; }
+.shopper .badge { background: transparent; color: var(--ink); border: 1.5px solid var(--ink); border-radius: 6px; padding: 1px 6px; font-size: 10.5px; }
+.shopper .chip { font-size: 12.5px; padding: 2px 9px 2px 3px; }
+.shopper .photo { width: 72px; border-radius: 12px; }
+.shopper .p-price { font-size: 20px; }
+.shopper .why { font-size: 13.5px; }
+.shopper .ai-tag { border-style: dashed; border-color: var(--muted); }
+.shopper .wont { font-size: 13px; border-radius: 10px; background: var(--no-bg); }
+.shopper .returns { font-size: 12.5px; }
+.shopper .returns.ask { background: var(--ask-bg); border-radius: 8px; padding: 6px 10px; font-weight: 500; }
+.shopper .levels .level { background: var(--soft); border-color: transparent; }
+.shopper .levels .level.on { background: var(--sheet); border-color: var(--ink); }
+.shopper .demo .sheet { background: var(--soft); border-radius: 14px; padding: 14px; }
+.shopper .demo .sheet + .sheet { border-top: 0; }
+@media (max-width: 560px) { .shopper { padding: 14px; border-radius: 18px; } }

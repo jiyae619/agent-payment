@@ -174,6 +174,10 @@ export default function Assistant() {
       <div className="stage">
       <PayPalPanel mandate={mandate} approved={approval !== null} payer={payer} level={level} run={snap} trap={trap} />
       <div className="shopper">
+      <div className="ph-top">
+        <b>Okay-Pay</b>
+        <span className="chip-sandbox">{runId ? RUNS.find((r) => r.id === runId)!.name : "Sandbox"}</span>
+      </div>
       <Stepper current={runId === "trap" ? 0 : stage} />
 
       {runId === "trap" ? (
