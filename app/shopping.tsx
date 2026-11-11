@@ -193,7 +193,7 @@ export default function Shopping({ approval, request, item, onEdit, onStage, onS
       decision: result?.decision ? { action: result.decision.action, messages: result.decision.action === "void" ? result.decision.reasons.map((x) => x.message) : result.decision.action === "ask" ? result.decision.checkins.map((x) => x.message) : [] } : undefined,
       proof: result?.proof,
       proofSeal: result?.proof_seal,
-      proofId: proof?.id,
+      proofId: proof?.id ?? (result as { proof_id?: string } | null)?.proof_id,
     });
   }, [onSnapshot, running, shelf, result, options]);
 

@@ -45,13 +45,13 @@ export const MARK: Record<Label, { cls: string; sym: string; name: string }> = {
 // The flow as the shopper walks it, one screen at a time.
 const STEPS = ["Ask", "Approve", "Shop", "Choose", "Pay"];
 
-function Stepper({ current }: { current: number }) {
+function Stepper({ current, stopped = false }: { current: number; stopped?: boolean }) {
   return (
     <ol className="stepper" aria-label="Steps">
       {STEPS.map((s, i) => (
         <li key={s} className={i < current ? "done" : i === current ? "now" : ""} aria-current={i === current ? "step" : undefined}>
           <span className="stepper-n" aria-hidden>{i < current ? "✓" : i + 1}</span>
-          <span className="stepper-label">{s}</span>
+          <span className="stepper-label">{stopped && i === STEPS.length - 1 ? "Stopped" : s}</span>
         </li>
       ))}
     </ol>
@@ -178,7 +178,7 @@ export default function Assistant() {
         <b>Okay-Pay</b>
         <span className="chip-sandbox">{runId ? RUNS.find((r) => r.id === runId)!.name : "Sandbox"}</span>
       </div>
-      <Stepper current={runId === "trap" ? 0 : stage} />
+      {runId !== "trap" && <Stepper current={stage} stopped={snap?.outcome === "released"} />}
 
       {runId === "trap" ? (
         <AttackDemo onResult={(t) => setTrap((list) => [...list.filter((x) => x.mode !== t.mode), t])} />

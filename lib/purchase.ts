@@ -143,7 +143,7 @@ export async function purchase(choice: Choice, productId: string, anyway = false
     const proof = record(decision, { ...ids, status: hold.status });
     const expires = trackPending(hold.authorizationId);
     const pending = seal({ authorizationId: hold.authorizationId, orderId: hold.orderId, amount: proposal.total, limit: max, title: c.product.title, proof, expires_at: expires });
-    return { status: 200, body: { ...shown, outcome: "ask", decision, paypal, pending, answer_minutes: ANSWER_MINUTES } };
+    return { status: 200, body: { ...shown, outcome: "ask", decision, paypal, pending, proof_id: proofId, answer_minutes: ANSWER_MINUTES } };
   } catch (err) {
     if (err instanceof PayPalError) {
       console.error(`[purchase] ${err.message}`);

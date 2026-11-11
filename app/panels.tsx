@@ -16,7 +16,7 @@ export type RunSnapshot = {
   options?: { store: string; title: string; total: number; wont: boolean; quotes: string[] }[];
   outcome?: string;
   pick?: { title: string; store: string; total: number; image?: string | null; url?: string | null };
-  paypal?: { orderId?: string; authorizationId?: string; held?: number; captureId?: string; amount?: number; status?: string; readBack?: { order: string } | null };
+  paypal?: { orderId?: string; authorizationId?: string; held?: number; captureId?: string; amount?: number; status?: string; readBack?: { order: string; authorization?: string | null } | null };
   decision?: { action: string; messages: string[] };
   proof?: unknown;
   proofSeal?: string;
@@ -62,7 +62,7 @@ export function PayPalPanel(p: Props) {
   }
   if (r?.paypal?.captureId) calls.push({ api: "Payments v2", what: `Capture ${money(r.paypal.amount ?? 0)} · ${short(r.paypal.captureId)}` });
   if (r?.outcome === "released" && r.paypal?.authorizationId) calls.push({ api: "Payments v2", what: `Void the hold · ${short(r.paypal.authorizationId)}` });
-  if (r?.paypal?.readBack) calls.push({ api: "Orders v2", what: `Read back: order ${r.paypal.readBack.order.toLowerCase()}` });
+  if (r?.paypal?.readBack) calls.push({ api: "Orders v2", what: `Read back: order ${r.paypal.readBack.order.toLowerCase()}${r.paypal.readBack.authorization ? ` · hold ${r.paypal.readBack.authorization.toLowerCase()}` : ""}` });
   for (const t of p.trap) {
     if (t.mode === "naive") {
       calls.push({ api: "Orders v2", what: `Total-only approval: hold and capture ${money(t.charged ?? 0)} for the gift card · order ${short(t.orderId)}` });
@@ -104,7 +104,8 @@ export function PayPalPanel(p: Props) {
 
 export function StorePanel(p: Props & { onCheck: () => void }) {
   const r = p.run;
-  const rules = p.mandate ? readbackRows(p.mandate).filter((x) => x.kind !== "expiry").length : 0;
+  // Same count the shopper saw at approval: their rules plus the always-on "asks if it can't be undone".
+  const rules = p.mandate ? readbackRows(p.mandate).filter((x) => x.kind !== "expiry").length + 1 : 0;
   return (
     <aside className="panel store" aria-label="The store">
       <span className="panel-kicker">The store</span>
@@ -129,7 +130,7 @@ export function StorePanel(p: Props & { onCheck: () => void }) {
             {(r.options ?? []).map((o, i) => (
               <div key={i} className={o.wont ? "store-row off" : "store-row"}>
                 <b>{o.store}</b> {money(o.total)} {o.wont ? "· won't pass" : ""}
-                {o.quotes.slice(0, 2).map((q, j) => <span key={j} className="quote-chip">&ldquo;{q}&rdquo;</span>)}
+                {o.quotes.slice(0, 3).map((q, j) => <span key={j} className="quote-chip">&ldquo;{q}&rdquo;</span>)}
               </div>
             ))}
           </div>
