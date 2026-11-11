@@ -13,12 +13,16 @@ import { suggest, type Suggestion } from "@/lib/suggest.ts";
 import { applyFix, findWarnings, type Fix, type Warning } from "@/lib/warnings.ts";
 import AttackDemo from "./attack-demo";
 import PayPalApprove from "./paypal-approve";
+import { PayPalPanel, StorePanel, type RunSnapshot, type TrapSnapshot } from "./panels";
 import Shopping, { type ShopStage } from "./shopping";
 
-const STARTERS = [
-  { label: "Running shoes", watch: "Strict rules: size, free returns, asks above $100", text: "Waterproof running shoes, size 8, under $120. Free returns please. Ask me if it's over $100." },
-  { label: "Dish soap", watch: "Buys 3; your limit covers the total", text: "3 bottles of dish soap, under $50 for all of them. Any store is fine." },
-  { label: "A guess to check", watch: "\"Doesn't smell like anything\" becomes a rule you confirm", text: "Dish soap that doesn't smell like anything, under $20." },
+// One purchase per run, real data each time: pick a run, pick how much it may guess, then go.
+type RunId = "buys" | "asks" | "stops" | "trap";
+const RUNS: { id: RunId; name: string; watch: string; text: string | null }[] = [
+  { id: "buys", name: "Buys it", watch: "3 bottles of dish soap. Every rule checks out, so PayPal charges.", text: "3 bottles of dish soap, under $50 for all of them. Any store is fine." },
+  { id: "asks", name: "Asks you first", watch: "Running shoes over your ask-first amount. PayPal holds and waits for you.", text: "Waterproof running shoes, size 8, under $120. Free returns please. Ask me if it's over $80." },
+  { id: "stops", name: "Stops itself", watch: "Waterproof shoes under $60 with free returns. No store proves it, so nothing is held.", text: "Waterproof running shoes, size 8, under $60. Free returns please." },
+  { id: "trap", name: "Prompt-injection trap", watch: "A web page hides orders for the agent.", text: null },
 ];
 
 export const MARK: Record<Label, { cls: string; sym: string; name: string }> = {
@@ -61,6 +65,11 @@ export default function Assistant() {
   // How much it may guess, picked with each request (lib/guesses.ts).
   const [level, setLevel] = useState<Level>("allow");
   const [shopStage, setShopStage] = useState<ShopStage>(2);
+  const [runId, setRunId] = useState<RunId | null>(null);
+  // What this run has done, for the PayPal and store panels (real data only).
+  const [snap, setSnap] = useState<RunSnapshot | null>(null);
+  const [trap, setTrap] = useState<TrapSnapshot[]>([]);
+  const onSnapshot = useCallback((s: RunSnapshot) => setSnap(s), []);
   const onStage = useCallback((s: ShopStage) => setShopStage(s), []);
   const stage = editing || !mandate ? 0 : !approval ? 1 : shopStage;
   // Each step is its own screen, so a new step starts at the top.
@@ -93,11 +102,36 @@ export default function Assistant() {
   function edit() {
     if (mandate) setText(mandate.source_text);
     setApproval(null);
+    setSnap(null);
     setEditing(true);
   }
 
+  // Starting a run resets the screen and both panels.
+  function pickRun(id: RunId) {
+    const r = RUNS.find((x) => x.id === id)!;
+    setRunId(id);
+    setText(r.text ?? "");
+    setMandate(null);
+    setApproval(null);
+    setSnap(null);
+    setTrap([]);
+    setError(null);
+    setEditing(true);
+  }
+
+  // Open what a store sees for this run's proof, the way a store would open the saved file.
+  function checkProof() {
+    if (!snap?.proof || !snap.proofSeal) return;
+    try {
+      localStorage.setItem("shopping-assistant:verify", JSON.stringify({ proof: snap.proof, seal: snap.proofSeal }));
+    } catch {
+      // storage blocked: /verify still accepts the saved file
+    }
+    window.open("/verify", "_blank");
+  }
+
   return (
-    <main className="page">
+    <main className="page stage-page">
       <header className="brand">
         <h1>Okay-Pay</h1>
         <nav className="brand-nav">
@@ -107,16 +141,27 @@ export default function Assistant() {
         </nav>
       </header>
 
-      <Stepper current={stage} />
+      <section className="hero" aria-labelledby="hero-title">
+        <h2 id="hero-title">An AI shops for you. PayPal pays only if your rules hold.</h2>
+        <p className="sub">Watch one purchase from three sides: PayPal on the left, you in the middle, the store on the right. Pick a run.</p>
+      </section>
+      <div className="runs" role="group" aria-label="Pick a run">
+        {RUNS.map((r) => (
+          <button key={r.id} type="button" className="try-card" aria-pressed={runId === r.id} onClick={() => pickRun(r.id)}>
+            <b>{r.name}</b>
+            <span>{r.watch}</span>
+          </button>
+        ))}
+      </div>
 
-      {stage === 0 && !mandate && (
-        <section className="hero" aria-labelledby="hero-title">
-          <h2 id="hero-title">An AI shops for you. PayPal pays only if your rules hold.</h2>
-          <p className="sub">It shows you how it read your request and what it looked at. You pick from what it found, and PayPal holds money only after that.</p>
-        </section>
-      )}
+      <div className="stage">
+      <PayPalPanel mandate={mandate} approved={approval !== null} payer={payer} level={level} run={snap} trap={trap} />
+      <div className="shopper">
+      <Stepper current={runId === "trap" ? 0 : stage} />
 
-      {editing || !mandate ? (
+      {runId === "trap" ? (
+        <AttackDemo onResult={(t) => setTrap((list) => [...list.filter((x) => x.mode !== t.mode), t])} />
+      ) : editing || !mandate ? (
         <section className="sheet" aria-labelledby="ask-title">
           <span className="step" id="ask-title">What should it buy?</span>
           <label htmlFor="request" className="sr-only">Your request</label>
@@ -128,18 +173,19 @@ export default function Assistant() {
             onChange={(e) => setText(e.target.value)}
             placeholder="Running shoes, size 8, under $120. Ask me if it's over $100."
           />
-          <div className="try" role="group" aria-label="Try one">
-            {STARTERS.map((s) => (
-              <button key={s.label} type="button" className="try-card" aria-pressed={text === s.text} onClick={() => setText(s.text)}>
-                <b>{s.label}</b>
-                <span>{s.watch}</span>
-              </button>
-            ))}
-            <a className="try-card" href="#attack">
-              <b>Prompt-injection trap</b>
-              <span>A web page hides orders for the agent</span>
-            </a>
-          </div>
+          <fieldset className="levels">
+            <legend className="sub">When it has to guess what you meant</legend>
+            <div className="level-row">
+              {LEVELS.map((l) => (
+                <label key={l.id} className={level === l.id ? "level on" : "level"}>
+                  <input type="radio" name="level" value={l.id} checked={level === l.id} onChange={() => setLevel(l.id)} />
+                  <b>{l.name}</b>
+                  <span>{l.note}</span>
+                </label>
+              ))}
+            </div>
+            <p className="note">Every level asks before it buys anything that can&apos;t be undone.</p>
+          </fieldset>
           <button type="button" className="btn primary" onClick={readBack} disabled={loading || !text.trim()}>
             {loading ? "Reading your request…" : "Show me what it will do"}
           </button>
@@ -177,10 +223,12 @@ export default function Assistant() {
       ) : (
         <>
           <p className="approved-line">✓ Approved with {payer ?? "PayPal"} · up to ${mandate.payment.amount_range.max}</p>
-          <Shopping key={approval} approval={approval} request={mandate.source_text} item={mandate.checkout.line_items[0]?.description ?? "anything"} onEdit={edit} onStage={onStage} />
+          <Shopping key={approval} approval={approval} request={mandate.source_text} item={mandate.checkout.line_items[0]?.description ?? "anything"} onEdit={edit} onStage={onStage} onSnapshot={onSnapshot} />
         </>
       )}
-      {stage === 0 && <AttackDemo />}
+      </div>
+      <StorePanel mandate={mandate} approved={approval !== null} payer={payer} level={level} run={snap} trap={trap} onCheck={checkProof} />
+      </div>
     </main>
   );
 }
@@ -273,19 +321,8 @@ function Readback(props: {
       <p className="quote small">You said: &ldquo;{mandate.source_text}&rdquo;</p>
       {!approved && <button type="button" className="link" onClick={props.onEdit}>Edit request</button>}
 
-      {found.length > 0 && (
-        <fieldset className="levels">
-          <legend className="sub">It had to guess what you meant. How should it handle that?</legend>
-          <div className="level-row">
-            {LEVELS.map((l) => (
-              <label key={l.id} className={props.level === l.id ? "level on" : "level"}>
-                <input type="radio" name="level" value={l.id} checked={props.level === l.id} onChange={() => props.onLevel(l.id)} />
-                <b>{l.name}</b>
-                <span>{l.note}</span>
-              </label>
-            ))}
-          </div>
-        </fieldset>
+      {found.length === 0 && (
+        <p className="note">No guesses in this request, so {LEVELS.find((l) => l.id === props.level)!.name} changes nothing here.</p>
       )}
       {found.length > 0 && (
         <p className="guess-note" role="status">

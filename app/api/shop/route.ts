@@ -87,13 +87,16 @@ export async function POST(request: Request) {
       // Options that can pass every rule come first; the rest are shown as "won't pass".
       const ranked = rankChecked(found);
       const fails = new Map(ranked.map((x) => [x.product.id, wontPass(m, x, m.checkout.line_items[0]?.quantity ?? 1)]));
-      const checked = [...ranked.filter((x) => !fails.get(x.product.id)!.length), ...ranked.filter((x) => fails.get(x.product.id)!.length)];
+      // Within those, options that can go straight through (return terms known) come before ones that
+      // would stop to ask "can't be undone", so a clean purchase is recommended when there is one.
+      const tier = (x: (typeof ranked)[number]) => (fails.get(x.product.id)!.length ? 2 : x.returns.evidence === "listing" || x.returns.evidence === "policy" ? 0 : 1);
+      const checked = [...ranked].sort((a, b) => tier(a) - tier(b));
       if (stopped()) return finish(499, { ...base, outcome: "stopped" });
       const quantity = m.checkout.line_items[0]?.quantity ?? 1;
       let chosen;
       try {
         // Recommend only among options that can pass, when there are any.
-        const passing = checked.filter((x) => !fails.get(x.product.id)!.length);
+        const passing = checked.filter((x) => tier(x) === 0).length ? checked.filter((x) => tier(x) === 0) : checked.filter((x) => tier(x) < 2);
         chosen = await pick(m.source_text, passing.length ? passing : checked, quantity);
       } catch {
         // The pick is a convenience: if the AI is unavailable, the code's top-ranked option is used.

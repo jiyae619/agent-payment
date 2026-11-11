@@ -6,16 +6,17 @@
 
 import { useState } from "react";
 import type { Decision } from "@/lib/enforce.ts";
+import type { TrapSnapshot } from "./panels";
 
 type Result = {
   error?: string;
   hidden_note?: string;
   proposed?: { title: string; price: number; store: string };
   decision?: Decision;
-  paypal?: { captureId?: string; amount?: number } | null;
+  paypal?: { orderId?: string; captureId?: string; amount?: number } | null;
 };
 
-export default function AttackDemo() {
+export default function AttackDemo({ onResult }: { onResult?: (t: TrapSnapshot) => void }) {
   const [naive, setNaive] = useState<Result | null>(null);
   const [informed, setInformed] = useState<Result | null>(null);
   const [busy, setBusy] = useState<"naive" | "informed" | null>(null);
@@ -25,6 +26,9 @@ export default function AttackDemo() {
     const res = await fetch("/api/demo/attack", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mode }) });
     const data: Result = await res.json().catch(() => ({ error: "Something went wrong." }));
     (mode === "naive" ? setNaive : setInformed)(res.ok ? data : { error: data.error ?? "Something went wrong." });
+    if (res.ok && onResult) {
+      onResult({ mode, charged: data.decision?.action === "capture" ? data.paypal?.amount ?? null : null, orderId: data.paypal?.orderId, captureId: data.paypal?.captureId, reason: data.decision?.action === "void" ? data.decision.reasons[0]?.message : undefined });
+    }
     setBusy(null);
   }
 

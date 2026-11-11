@@ -12,6 +12,7 @@ import type { Policy } from "@/lib/policy.ts";
 import type { Returns } from "@/lib/check-core.ts";
 import { RATING_TEXT, REASON_TEXT, recordEntry, updateEntry, type DontBuyReason, type Outcome, type Rating } from "@/lib/history.ts";
 import type { FunnelStep } from "@/lib/shortlist.ts";
+import type { RunSnapshot } from "./panels";
 
 type Step = { step: string; text: string; count?: number };
 // The live shelf: what the agent found, and what happened to each item as it shopped.
@@ -83,7 +84,7 @@ function sendFeedback(kind: "dont_buy_reason" | "rating", value: string, r: Shop
 // Which step of the flow this screen is: 2 shopping, 3 choosing, 4 paying (and the result).
 export type ShopStage = 2 | 3 | 4 | 5; // 5 = finished, every step done
 
-export default function Shopping({ approval, request, item, onEdit, onStage }: { approval: string; request: string; item: string; onEdit: () => void; onStage: (s: ShopStage) => void }) {
+export default function Shopping({ approval, request, item, onEdit, onStage, onSnapshot }: { approval: string; request: string; item: string; onEdit: () => void; onStage: (s: ShopStage) => void; onSnapshot?: (s: RunSnapshot) => void }) {
   const [steps, setSteps] = useState<Step[]>([]);
   const [shelf, setShelf] = useState<Shelf>(NO_SHELF);
   const [result, setResult] = useState<ShopResult | null>(null);
@@ -171,6 +172,30 @@ export default function Shopping({ approval, request, item, onEdit, onStage }: {
     onStage(stage);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [stage, onStage]);
+
+  // Tell the page what this run has done so far, for the PayPal and store panels beside it.
+  useEffect(() => {
+    if (!onSnapshot) return;
+    const list = (result?.options ?? options?.options ?? []);
+    const proof = result?.proof as { id?: string } | undefined;
+    onSnapshot({
+      running,
+      found: shelf.items.length,
+      kept: shelf.kept?.length ?? 0,
+      checked: Object.keys(shelf.checked).length,
+      options: list.map((o) => ({
+        store: o.product.store, title: o.product.title, total: o.total, wont: (o.wont_pass?.length ?? 0) > 0,
+        quotes: o.checks.filter((c) => c.verdict === "checked" && c.quote).map((c) => c.quote!),
+      })),
+      outcome: result?.outcome,
+      pick: result?.pick ? { title: result.pick.product.title, store: result.pick.product.store, total: result.pick.total ?? result.pick.product.price, image: result.pick.product.image, url: result.pick.product.url } : undefined,
+      paypal: result?.paypal ? { ...result.paypal, readBack: result.paypal.readBack ?? null } : undefined,
+      decision: result?.decision ? { action: result.decision.action, messages: result.decision.action === "void" ? result.decision.reasons.map((x) => x.message) : result.decision.action === "ask" ? result.decision.checkins.map((x) => x.message) : [] } : undefined,
+      proof: result?.proof,
+      proofSeal: result?.proof_seal,
+      proofId: proof?.id,
+    });
+  }, [onSnapshot, running, shelf, result, options]);
 
   async function answer(a: "pay" | "dont") {
     if (!result?.pending) return;
@@ -426,7 +451,6 @@ function Picked({ result, busy, onAnswer, onEdit, onBack }: { result: ShopResult
 
 function Done({ result }: { result: ShopResult }) {
   const pp = result.paypal;
-  const rb = pp?.readBack;
   const asked = result.decision?.action === "ask";
   const charged = pp?.amount ?? 0;
   return (
@@ -442,7 +466,12 @@ function Done({ result }: { result: ShopResult }) {
           )}
           <div className="p-info">
             <div className="p-title">{result.pick.product.title}</div>
-            <span className="sub">{result.pick.product.store}{result.pick.total_line ? ` · ${result.pick.total_line}` : ""}</span>
+            {result.pick.product.url ? (
+              <a className="p-link" href={result.pick.product.url} target="_blank" rel="noreferrer">{result.pick.product.store} ↗</a>
+            ) : (
+              <span className="sub">{result.pick.product.store}</span>
+            )}
+            {result.pick.total_line && <span className="sub">{result.pick.total_line}</span>}
             <div className="money">{money(charged)}</div>
             <span className="sub">{result.refunded ? "Refunded" : "Charged to PayPal"}</span>
           </div>
@@ -460,30 +489,7 @@ function Done({ result }: { result: ShopResult }) {
           <li className="li"><span className="mark ok" aria-hidden>✓</span><span className="what">Every check passed</span></li>
         )}
       </ul>
-      <p className="sub">
-        Problem later? If it doesn&apos;t arrive or isn&apos;t as described, PayPal Purchase Protection may cover it. If you change your mind,
-        refund it from <Link href="/purchases">Your purchases</Link>.
-      </p>
-      {result.proof && result.proof_seal && (
-        <button type="button" className="btn secondary" onClick={() => saveProof(result.proof, result.proof_seal!, result.proof!.paypal.order_id)}>
-          Save as proof
-        </button>
-      )}
-      {result.proof && result.proof_seal && (
-        <p className="note">A store or PayPal can check the saved file at <a href="/verify" target="_blank" rel="noreferrer">/verify</a>. The file doesn&apos;t include your own words.</p>
-      )}
-      <details className="more">
-        <summary>Details</summary>
-        <dl>
-          <dt>PayPal order</dt><dd>{pp?.orderId}</dd>
-          {pp?.captureId && (<><dt>Charge</dt><dd>{pp.captureId}</dd></>)}
-          {result.refunded && (<><dt>Refund</dt><dd>{result.refunded.refundId}</dd></>)}
-          {rb && (<><dt>PayPal says</dt><dd>{rb.order.toLowerCase()}{rb.capture ? `, ${money(rb.capture.amount)} ${rb.capture.status.toLowerCase()}` : ""}</dd></>)}
-        </dl>
-        {result.proof && (
-          <ol>{result.proof.events.map((e, i) => <li key={i}>{new Date(e.at).toLocaleTimeString()} · {e.what}</li>)}</ol>
-        )}
-      </details>
+      <Link className="link" href="/purchases">Your purchases</Link>
     </section>
   );
 }
