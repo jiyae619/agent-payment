@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Atkinson_Hyperlegible, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
+import { ThemeInit } from "./theme-toggle";
 
 // Atkinson Hyperlegible: designed for low-vision readers, chosen for non-technical shoppers.
 // IBM Plex Mono: money and the store's quoted words, so figures line up and quotes read as quotes.
@@ -16,6 +17,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={`${sans.variable} ${mono.variable} antialiased`}>
       <body>
+        <ThemeInit />
         {children}
         <footer className="site-foot">Okay-Pay is a hackathon demo on PayPal sandbox. Not affiliated with or endorsed by PayPal.</footer>
       </body>

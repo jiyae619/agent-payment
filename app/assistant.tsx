@@ -15,14 +15,23 @@ import AttackDemo from "./attack-demo";
 import PayPalApprove from "./paypal-approve";
 import { PayPalPanel, StorePanel, type RunSnapshot, type TrapSnapshot } from "./panels";
 import Shopping, { type ShopStage } from "./shopping";
+import ThemeToggle from "./theme-toggle";
 
 // One purchase per run, real data each time: pick a run, pick how much it may guess, then go.
 type RunId = "buys" | "asks" | "stops" | "trap";
-const RUNS: { id: RunId; name: string; watch: string; text: string | null }[] = [
-  { id: "buys", name: "Buys it", watch: "3 bottles of dish soap. Every rule checks out, so PayPal charges.", text: "3 bottles of dish soap, under $50 for all of them. Any store is fine." },
-  { id: "asks", name: "Asks you first", watch: "Running shoes over your ask-first amount. PayPal holds and waits for you.", text: "Waterproof running shoes, size 8, under $120. Free returns please. Ask me if it's over $80." },
-  { id: "stops", name: "Stops itself", watch: "Waterproof shoes under $60 with free returns. No store proves it, so nothing is held.", text: "Waterproof running shoes, size 8, under $60. Free returns please." },
-  { id: "trap", name: "Prompt-injection trap", watch: "A web page hides orders for the agent.", text: null },
+const ICON: Record<RunId, string> = {
+  buys: '<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="32" cy="32" r="22"/><circle cx="32" cy="32" r="15" stroke-dasharray="2 3"/><path d="M23 33l6 6 12-14" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  asks: '<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M10 14h44v28H30l-10 9v-9H10z"/><path d="M27 24a5 5 0 1 1 7 4.5c-1.5.8-2 1.6-2 3.5" stroke-width="2" stroke-linecap="round"/><circle cx="32" cy="37" r="1.4" fill="currentColor"/></svg>',
+  stops: '<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M32 8l20 8v14c0 13-9 22-20 26-11-4-20-13-20-26V16z"/><path d="M32 16v26" stroke-dasharray="2 3"/><path d="M24 30h16" stroke-width="2" stroke-linecap="round"/></svg>',
+  trap: '<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><rect x="10" y="22" width="44" height="28" rx="3"/><path d="M10 30h44M26 22v28"/><path d="M26 22c-6-8 6-11 6-3M26 22c6-8 14-5 8 0"/><path d="M14 12l36 44" stroke-width="2" stroke-linecap="round"/></svg>',
+};
+const TONE: Record<RunId, string> = { buys: "buy", asks: "ask", stops: "stop", trap: "trap" };
+
+const RUNS: { id: RunId; name: string; watch: string; foot: string; text: string | null }[] = [
+  { id: "buys", name: "Buys it", watch: "3 bottles of dish soap. Every rule checks out, so PayPal charges.", foot: "3 × dish soap · under $50 for all", text: "3 bottles of dish soap, under $50 for all of them. Any store is fine." },
+  { id: "asks", name: "Asks you first", watch: "Running shoes over your ask-first amount. PayPal holds and waits for you.", foot: "Running shoes · asks above $80", text: "Waterproof running shoes, size 8, under $120. Free returns please. Ask me if it's over $80." },
+  { id: "stops", name: "Stops itself", watch: "Waterproof shoes under $60 with free returns. No store proves it, so nothing is held.", foot: "Waterproof · under $60 · free returns", text: "Waterproof running shoes, size 8, under $60. Free returns please." },
+  { id: "trap", name: "Prompt-injection trap", watch: "A web page hides orders for the agent.", foot: "A store page hides orders for the agent", text: null },
 ];
 
 export const MARK: Record<Label, { cls: string; sym: string; name: string }> = {
@@ -137,6 +146,7 @@ export default function Assistant() {
         <nav className="brand-nav">
           <Link href="/purchases">Your purchases</Link>
           <Link href="/how-it-works">How it works</Link>
+          <ThemeToggle />
           <span className="chip-sandbox">Sandbox</span>
         </nav>
       </header>
@@ -145,13 +155,20 @@ export default function Assistant() {
         <h2 id="hero-title">An AI shops for you. PayPal pays only if your rules hold.</h2>
         <p className="sub">Watch one purchase from three sides: PayPal on the left, you in the middle, the store on the right. Pick a run.</p>
       </section>
-      <div className="runs" role="group" aria-label="Pick a run">
-        {RUNS.map((r) => (
-          <button key={r.id} type="button" className="try-card" aria-pressed={runId === r.id} onClick={() => pickRun(r.id)}>
-            <b>{r.name}</b>
-            <span>{r.watch}</span>
-          </button>
-        ))}
+      <div className="deck" role="group" aria-label="Pick a run">
+        {RUNS.map((r, i) => {
+          // Fanned like a hand of cards; the picked one lifts.
+          const k = i - (RUNS.length - 1) / 2;
+          const on = runId === r.id;
+          return (
+            <button key={r.id} type="button" className="dcard" data-t={TONE[r.id]} aria-pressed={on} title={r.watch} onClick={() => pickRun(r.id)}
+              style={{ transform: `translate(${k * 150}px, ${k * k * 9 - (on ? 22 : 0)}px) rotate(${k * 6}deg)`, zIndex: on ? 5 : i }}>
+              <b>{r.name}</b>
+              <span className="ic" aria-hidden dangerouslySetInnerHTML={{ __html: ICON[r.id] }} />
+              <span className="foot">{r.foot}</span>
+            </button>
+          );
+        })}
       </div>
 
       <div className="stage">
