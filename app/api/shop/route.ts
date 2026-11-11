@@ -4,7 +4,7 @@ import { releaseExpiredHolds } from "@/lib/hold.ts";
 import { allowRun, visitorKey } from "@/lib/guard.ts";
 import { pick } from "@/lib/pick.ts";
 import { rankChecked } from "@/lib/pick-core.ts";
-import { optionView, wontPass, type Choice } from "@/lib/purchase.ts";
+import { canChooseAnyway, optionView, wontPass, type Choice } from "@/lib/purchase.ts";
 import { searchProducts } from "@/lib/search.ts";
 import { searchQuery, shortlist, whyDropped } from "@/lib/shortlist.ts";
 
@@ -122,7 +122,7 @@ export async function POST(request: Request) {
         ...base,
         outcome: "choose",
         recommended: choice.recommended,
-        options: choice.candidates.map((x) => optionView(x, quantity, fails.get(x.product.id))),
+        options: choice.candidates.map((x) => optionView(x, quantity, fails.get(x.product.id), fails.get(x.product.id)!.length > 0 && canChooseAnyway(m, x, quantity))),
         choice: seal(choice),
       });
     },

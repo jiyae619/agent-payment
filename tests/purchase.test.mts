@@ -31,3 +31,11 @@ test("an option whose must-have can't be confirmed won't pass, and says why, bef
 test("an option that proves every rule passes the pre-check", () => {
   assert.deepEqual(wontPass(mandate, option("checked"), 1), []);
 });
+
+test("a shopper can choose anyway when only their own must-haves are unconfirmed", async () => {
+  const { canChooseAnyway } = await import("../lib/purchase.ts");
+  assert.equal(canChooseAnyway(mandate, option("couldnt_check"), 1), true);
+  // Over the $120 limit is a hard limit: no "choose anyway".
+  const pricey = { ...option("couldnt_check"), product: { ...product, price: 150 } as CatalogProduct };
+  assert.equal(canChooseAnyway(mandate, pricey, 1), false);
+});

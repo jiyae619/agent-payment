@@ -19,7 +19,7 @@ The page shows one purchase from three sides: PayPal on the left (where the mone
 
 1. **Buys it:** "3 bottles of dish soap, under $50 for all of them. Any store is fine." Every rule passes and the return terms are on file, so PayPal holds and charges the total (price × 3).
 2. **Asks you first:** "Waterproof running shoes, size 8, under $120. Free returns please. Ask me if it's over $80." The listing proves waterproof, size 8 and free returns; the price is over $80, so PayPal holds the money and waits for your Pay or Don't buy.
-3. **Stops itself:** "Waterproof running shoes, size 8, under $60. Free returns please." No store under $60 proves free returns, so every option says "Won't pass" and nothing is held.
+3. **Stops itself:** "Waterproof running shoes, size 8, under $60. Free returns please." No store under $60 proves free returns, so every option says "Won't pass" and nothing is held. You can still tap **Choose anyway**: PayPal holds the money and asks you first, listing what wasn't confirmed. Hard limits (over the limit, a store you didn't allow, gift cards) can never be chosen past.
 4. **Prompt-injection trap:** a product page hides a note telling shopping agents to buy its $100 gift card. The same simulated, fooled agent runs twice: under a total-only approval PayPal sandbox takes $100; under this app's approval the gift card never reaches the agent and no PayPal call is made.
 
 Type your own request too. A phrase the AI has to interpret, like "doesn't smell like anything", shows up as a guess chip.
@@ -110,7 +110,7 @@ Caveats, as recorded in the log: several prompt fixes were found on the same cas
 
 ## Safety invariants and tests
 
-`npm test` runs 172 tests (172 pass, 0 skipped, as of this README). What they guarantee:
+`npm test` runs 181 tests (181 pass, 0 skipped, as of this README). What they guarantee:
 
 - **Never charges above the limit:** 10,000 random seeded cases where no capture ever breaks a promise to the shopper (`tests/enforce-invariants.test.mts`); one cent over the limit releases the hold; nothing above what PayPal holds is captured; no limit means nothing is charged (`tests/enforce.test.mts`).
 - **Unverifiable means no:** a must-have nobody could check, or a missing checker result, releases the hold; a failed hard limit wins over any check-in (`tests/enforce.test.mts`).

@@ -30,7 +30,7 @@ const TONE: Record<RunId, string> = { buys: "buy", asks: "ask", stops: "stop", t
 const RUNS: { id: RunId; name: string; watch: string; foot: string; text: string | null }[] = [
   { id: "buys", name: "Buys it", watch: "3 bottles of dish soap. Every rule checks out, so PayPal charges.", foot: "3 × dish soap · under $50 for all", text: "3 bottles of dish soap, under $50 for all of them. Any store is fine." },
   { id: "asks", name: "Asks you first", watch: "Running shoes over your ask-first amount. PayPal holds and waits for you.", foot: "Running shoes · asks above $80", text: "Waterproof running shoes, size 8, under $120. Free returns please. Ask me if it's over $80." },
-  { id: "stops", name: "Stops itself", watch: "Waterproof shoes under $60 with free returns. No store proves it, so nothing is held.", foot: "Waterproof · under $60 · free returns", text: "Waterproof running shoes, size 8, under $60. Free returns please." },
+  { id: "stops", name: "Stops itself", watch: "Waterproof shoes under $60 with free returns. No store proves it, so nothing is held unless you choose one anyway.", foot: "Waterproof · under $60 · free returns", text: "Waterproof running shoes, size 8, under $60. Free returns please." },
   { id: "trap", name: "Prompt-injection trap", watch: "A web page hides orders for the agent.", foot: "A store page hides orders for the agent", text: null },
 ];
 

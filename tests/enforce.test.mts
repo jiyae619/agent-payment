@@ -199,3 +199,18 @@ test("a failed hard limit releases the hold even when a check-in would also fire
   const d = decide(mandate(), proposal({ total: 130, is_substitute: true }), ctx({ held: 130 }));
   assert.equal(d.action, "void");
 });
+
+test("an unconfirmed must-have the shopper chose anyway becomes a question, never a charge on its own", () => {
+  // The shopper saw "won't pass" and chose it: they decide, so it asks again before PayPal charges.
+  const unsure = proposal({ checks: [{ attr: "size", value: "8", verdict: "checked", quote: "8" }, { attr: "waterproof", value: "yes", verdict: "couldnt_check", quote: null }] });
+  assert.equal(decide(mandate(), unsure, ctx()).action, "void");
+  const d = decide(mandate(), { ...unsure, chosen_anyway: true }, ctx());
+  assert.equal(d.action, "ask");
+  assert.ok(askRules(d).includes("not_confirmed"));
+});
+
+test("choosing anyway never gets past a hard limit: over the limit or a store you didn't allow still releases", () => {
+  const unsure = { checks: [{ attr: "size", value: "8", verdict: "checked" as const, quote: "8" }, { attr: "waterproof", value: "yes", verdict: "didnt_match" as const, quote: "Water-resistant" }], chosen_anyway: true };
+  assert.equal(decide(mandate(), proposal({ ...unsure, total: 130 }), ctx({ held: 130 })).action, "void");
+  assert.equal(decide(mandate(), proposal({ ...unsure, product: { ...SHOE, store: "other.com" } }), ctx()).action, "void");
+});

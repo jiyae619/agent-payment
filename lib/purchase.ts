@@ -32,8 +32,8 @@ export type Choice = {
 const round = (n: number) => Math.round(n * 100) / 100;
 
 // What the choose screen shows for one option: the product, its checks and its total, in code.
-export function optionView(c: Candidate, quantity: number, wont_pass: string[] = []) {
-  return { wont_pass, product: c.product, checks: c.checks, policy: c.policy, returns: c.returns, total: round(c.product.price * quantity), total_line: totalLine(c.product.price, quantity) };
+export function optionView(c: Candidate, quantity: number, wont_pass: string[] = [], can_choose_anyway = false) {
+  return { wont_pass, can_choose_anyway, product: c.product, checks: c.checks, policy: c.policy, returns: c.returns, total: round(c.product.price * quantity), total_line: totalLine(c.product.price, quantity) };
 }
 
 // The same rule check enforcement runs after the hold, run first with no money held. An option that
@@ -46,7 +46,16 @@ export function wontPass(m: Mandate, c: Candidate, quantity: number, now = new D
   return d.action === "void" ? d.reasons.map((r) => r.message) : [];
 }
 
-export async function purchase(choice: Choice, productId: string): Promise<{ status: number; body: object }> {
+// Can the shopper still choose an option that won't pass? Only when what fails is their own
+// must-haves (not confirmed, or not matching). Hard limits (amount, stores, gift cards, expiry)
+// can never be chosen past.
+export function canChooseAnyway(m: Mandate, c: Candidate, quantity: number, now = new Date()): boolean {
+  const total = round(c.product.price * quantity);
+  const proposal: Proposal = { product: c.product, quantity, total, checks: c.checks, is_substitute: !isNamedItem(m, c.product), final_sale: c.final_sale, returns: c.returns.evidence, chosen_anyway: true };
+  return decide(m, proposal, { now, held: total }).action !== "void";
+}
+
+export async function purchase(choice: Choice, productId: string, anyway = false): Promise<{ status: number; body: object }> {
   const approved = openApproval(choice.approval);
   const m = approved.mandate;
   const max = m.payment.amount_range.max;
@@ -55,12 +64,13 @@ export async function purchase(choice: Choice, productId: string): Promise<{ sta
   const c = choice.candidates.find((x) => x.product.id === productId);
   if (!c) return { status: 400, body: { error: "That option isn't one it checked. Please choose again." } };
   const fails = wontPass(m, c, choice.quantity);
-  if (fails.length) return { status: 400, body: { error: `This one can't pass your rules, so nothing was held. ${fails.join(" ")}` } };
+  const overriding = fails.length > 0 && anyway && canChooseAnyway(m, c, choice.quantity);
+  if (fails.length && !overriding) return { status: 400, body: { error: `This one can't pass your rules, so nothing was held. ${fails.join(" ")}` } };
 
   const { quantity, funnel, shortlist } = choice;
   const recommended = choice.recommended.id === productId;
-  const reason = recommended ? choice.recommended.reason : "You chose this one instead of its recommendation.";
-  const by = recommended ? choice.recommended.by : "shopper";
+  const reason = overriding ? "You chose this one knowing not every must-have was confirmed." : recommended ? choice.recommended.reason : "You chose this one instead of its recommendation.";
+  const by = overriding ? "shopper" : recommended ? choice.recommended.by : "shopper";
   const proposal: Proposal = {
     product: c.product,
     quantity,
@@ -69,6 +79,7 @@ export async function purchase(choice: Choice, productId: string): Promise<{ sta
     is_substitute: !isNamedItem(m, c.product),
     final_sale: c.final_sale,
     returns: c.returns.evidence,
+    chosen_anyway: overriding,
   };
   const shown = {
     funnel,
@@ -87,6 +98,7 @@ export async function purchase(choice: Choice, productId: string): Promise<{ sta
   const events: ProofEvent[] = [
     { at: approved.approved_at, what: `You approved these instructions with PayPal (${levelName(approved.level ?? "allow")}).` },
     { at: new Date().toISOString(), what: `You chose "${c.product.title}" from ${choice.candidates.length} checked options.` },
+    ...(overriding ? [{ at: new Date().toISOString(), what: `You chose it although it didn't pass: ${fails.join(" ")}` }] : []),
   ];
   const log = (what: string) => events.push({ at: new Date().toISOString(), what });
   const record = (decision: Decision, paypal: PayPalRecord) =>

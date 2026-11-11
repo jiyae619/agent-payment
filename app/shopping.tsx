@@ -19,7 +19,7 @@ type Step = { step: string; text: string; count?: number };
 type ShelfItem = { id: string; title: string; price: number; store: string; image: string | null };
 type Shelf = { items: ShelfItem[]; kept?: string[]; dropped?: Record<string, string>; checked: Record<string, { ok: number; of: number }>; picked?: string };
 const NO_SHELF: Shelf = { items: [], checked: {} };
-type Option = { wont_pass?: string[]; product: CatalogProduct; checks: CheckResult[]; policy: Policy | null; returns?: Returns; total: number; total_line: string | null };
+type Option = { wont_pass?: string[]; can_choose_anyway?: boolean; product: CatalogProduct; checks: CheckResult[]; policy: Policy | null; returns?: Returns; total: number; total_line: string | null };
 type ShopResult = {
   outcome?: "choose" | "bought" | "released" | "ask" | "nothing_found" | "stopped";
   options?: Option[];
@@ -152,10 +152,10 @@ export default function Shopping({ approval, request, item, onEdit, onStage, onS
   }, []);
 
   // The shopper picked one option. Only now does PayPal hold money; code then decides.
-  async function buy(productId: string) {
+  async function buy(productId: string, anyway = false) {
     if (!result?.choice) return;
     setBuying(productId);
-    const res = await fetch("/api/shop/buy", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ choice: result.choice, productId }) });
+    const res = await fetch("/api/shop/buy", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ choice: result.choice, productId, anyway }) });
     const r = await res.json().catch(() => ({ error: "Something went wrong. Nothing was charged." }));
     setBuying(null);
     if (!res.ok && !r.pick) {
@@ -526,7 +526,7 @@ function ShelfView({ shelf }: { shelf: Shelf }) {
 // Step 4: up to three options it checked the same way. The recommendation comes first with the
 // AI's one-sentence reason; the others show their price and checks, written by code. Nothing is
 // held until the shopper taps one, and enforcement still checks the one they choose.
-function Choose({ result, buying, onBuy, onEdit }: { result: ShopResult; buying: string | null; onBuy: (id: string) => void; onEdit: () => void }) {
+function Choose({ result, buying, onBuy, onEdit }: { result: ShopResult; buying: string | null; onBuy: (id: string, anyway?: boolean) => void; onEdit: () => void }) {
   const rec = result.recommended;
   const options = result.options ?? [];
   const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -542,7 +542,7 @@ function Choose({ result, buying, onBuy, onEdit }: { result: ShopResult; buying:
         );
       })()}
       {options.every((o) => o.wont_pass?.length) && (
-        <p className="sub">Nothing was held. Edit your request, for example drop a must-have the stores don&apos;t confirm or raise the limit.</p>
+        <p className="sub">Nothing is held yet. You can still choose one: it will show you what wasn&apos;t confirmed and ask before PayPal charges anything. Or edit your request.</p>
       )}
       <ul className="options">
         {options.map((o) => {
@@ -589,7 +589,14 @@ function Choose({ result, buying, onBuy, onEdit }: { result: ShopResult; buying:
               )}
               {isRec && rec && <p className="why"><b>Why this one:</b> {rec.reason}{rec.by === "ai" && <span className="ai-tag">AI</span>}</p>}
               {blocked ? (
-                <p className="wont"><b>Won&apos;t pass:</b> {o.wont_pass!.join(" ")}</p>
+                <>
+                  <p className="wont"><b>Won&apos;t pass:</b> {o.wont_pass!.join(" ")}</p>
+                  {o.can_choose_anyway && (
+                    <button type="button" className="btn secondary" disabled={buying !== null} onClick={() => onBuy(o.product.id, true)}>
+                      {buying === o.product.id ? "PayPal is holding…" : `Choose anyway · ${money(o.total)}`}
+                    </button>
+                  )}
+                </>
               ) : (
                 <button type="button" className={isRec ? "btn primary" : "btn secondary"} disabled={buying !== null} onClick={() => onBuy(o.product.id)}>
                   {buying === o.product.id ? "PayPal is holding…" : `Choose this · ${money(o.total)}`}

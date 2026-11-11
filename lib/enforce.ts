@@ -21,6 +21,9 @@ export type Proposal = {
   final_sale?: boolean; // the listing says final sale / non-returnable; unset = the listing doesn't say
   price_at_approval?: number; // unit price the shopper saw when approving; unset = no earlier price to compare
   returns?: "final_sale" | "kind" | "listing" | "policy" | "not_found"; // can it be undone (lib/check-core.ts returnsFor); unset = not known
+  // The shopper saw which must-haves weren't confirmed and chose this option anyway. Those become a
+  // question before paying, never a charge on their own. Hard limits are never affected.
+  chosen_anyway?: boolean;
 };
 
 export type Context = {
@@ -32,7 +35,7 @@ export type Context = {
 export type VoidRule =
   | "no_limit" | "over_limit" | "over_hold" | "bad_total" | "store_not_allowed" | "store_avoided" | "expired"
   | "over_quantity" | "blocked_category" | "not_exact_item" | "didnt_match" | "couldnt_check";
-export type CheckinRule = "over_amount" | "substitute" | "new_store" | "price_changed" | "final_sale" | "cant_undo" | "bought_recently";
+export type CheckinRule = "over_amount" | "substitute" | "new_store" | "price_changed" | "final_sale" | "cant_undo" | "not_confirmed" | "bought_recently";
 
 export type Decision =
   | { action: "capture"; amount: number }
@@ -84,16 +87,19 @@ export function decide(m: Mandate, p: Proposal, ctx: Context): Decision {
   if (p.is_substitute && m.match_mode === "exact") fail("not_exact_item", "This isn't the exact item you named.");
 
   // 2. Product checks. Every must-have and condition of sale needs a "checked" result.
+  const unmet: { rule: VoidRule; message: string }[] = [];
   for (const pref of [...m.ext.must_haves, ...m.ext.conditions_of_sale]) {
     const r = p.checks.find((c) => c.attr === pref.attr && c.value === pref.value);
-    if (!r || r.verdict === "couldnt_check") fail("couldnt_check", `Couldn't check "${pref.attr}: ${pref.value}" from the store's listing.`);
-    else if (r.verdict === "didnt_match") fail("didnt_match", `The listing doesn't match "${pref.attr}: ${pref.value}".`);
+    if (!r || r.verdict === "couldnt_check") unmet.push({ rule: "couldnt_check", message: `Couldn't check "${pref.attr}: ${pref.value}" from the store's listing.` });
+    else if (r.verdict === "didnt_match") unmet.push({ rule: "didnt_match", message: `The listing doesn't match "${pref.attr}: ${pref.value}".` });
   }
 
-  if (fails.length) return { action: "void", reasons: fails };
+  // A hard limit always releases. An unmet must-have releases too, unless the shopper chose this
+  // option knowing it: then it is asked again before paying (check-ins below).
+  if (fails.length || (unmet.length && !p.chosen_anyway)) return { action: "void", reasons: [...fails, ...unmet] };
 
   // 3. Check-ins: the shopper decides.
-  const asks: { rule: CheckinRule; message: string }[] = [];
+  const asks: { rule: CheckinRule; message: string }[] = unmet.map((u) => ({ rule: "not_confirmed" as const, message: `You chose this anyway: ${u.message}` }));
   const has = (type: string) => m.ext.checkins.some((c) => c.type === type);
   for (const c of m.ext.checkins) {
     if (c.type === "over_amount" && cents(p.total) > cents(c.value)) {
