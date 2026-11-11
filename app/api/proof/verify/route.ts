@@ -1,5 +1,6 @@
 import { readOrder } from "@/lib/hold.ts";
 import { proofIsIntact, type Proof } from "@/lib/proof.ts";
+import { eventsFor } from "@/lib/webhook.ts";
 
 // POST { proof, seal } → { intact, paypal }: is this saved proof exactly what the server issued, and
 // is it the record of that PayPal order? Anyone holding the file (the shopper, a store, a PayPal
@@ -24,5 +25,7 @@ export async function POST(request: Request) {
       paypal = null; // PayPal didn't answer; the seal check still stands
     }
   }
-  return Response.json({ intact, paypal });
+  // What PayPal told us itself, through signed webhooks (kept in memory, so recent ones only).
+  const webhooks = intact ? eventsFor(proof.paypal?.order_id ?? null, proof.id ?? null) : [];
+  return Response.json({ intact, paypal, webhooks });
 }

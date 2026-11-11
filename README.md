@@ -57,6 +57,7 @@ All money-moving calls are plain REST in `lib/paypal.ts` and `lib/hold.ts`; the 
 - **Idempotency:** every money-moving POST sends `PayPal-Request-Id` from `stepRequestId(resource, step)`: stable per step on one resource, so a retried charge or release replays PayPal's first answer instead of acting twice. The hold's key is stable per approval + product.
 - **Proof ID on the order:** every hold sets `purchase_units[0].custom_id` to the proof record's id and puts the returns label plus anything not confirmed in the item description. [`/verify`](https://shopping-assistant-z5u2.onrender.com/verify) lets a store or PayPal open a saved proof: it checks the seal, reads the PayPal order and confirms its `custom_id` matches, then shows the rules, quotes, level and timeline, never the shopper's own words (`app/api/proof/verify/route.ts`, `app/verify/`).
 - **Read-back:** the receipt shows `GET /v2/checkout/orders/{id}` as PayPal reports it, never assumed from our own calls.
+- **Webhooks (optional):** with `PAYPAL_WEBHOOK_ID` set, `app/api/paypal/webhook/route.ts` receives hold, void, capture and refund events. Each one is checked with PayPal's `POST /v1/notifications/verify-webhook-signature` before it is trusted, and a retried delivery counts once (`lib/webhook.ts`, `tests/webhook.test.mts`). `/verify` lists them as "PayPal told us directly". The demo has no database, so events live in memory and are lost when the server restarts; the read-back above still works without them.
 - The vault id is set by the server, never by the model, and is left out of the shareable proof file.
 
 ## Model scorecard
@@ -146,6 +147,7 @@ npm run dev                    # http://localhost:3000
 | `CHANNEL3_API_KEY` | Product search |
 | `ANTHROPIC_API_KEY` | Drafter, checker and pick |
 | `APPROVAL_SECRET` | 32+ random characters; seals approvals and proofs |
+| `PAYPAL_WEBHOOK_ID` | Optional. From `npm run register-webhook`; turns on webhook events. |
 | `PAYPAL_DEMO_VAULT_ID` | The saved sandbox account shoppers buy with. In dev, open `/day1`, click "Save PayPal account", log in with your sandbox personal account, then paste the vault id it shows. |
 
 Optional: `npm run catalog` saves a Channel3 snapshot to `data/catalog.json` (not committed) as a search backup.
@@ -159,6 +161,7 @@ npm run fixtures -- --runs=3     # drafter eval on the app's exact setup (Anthro
 npm run eval-checker -- claude-sonnet-5:high --runs=3
 npm run eval-pick
 npm run feedback -- server.log   # Loop 2
+npm run demo-check               # is the public demo ready for judges?
 ```
 
 Non-Claude models were compared through the Astropods AI Gateway in a container; see [eval/README.md](eval/README.md). The public app does not use Astropods.
@@ -166,6 +169,14 @@ Non-Claude models were compared through the Astropods AI Gateway in a container;
 ### Deploy
 
 `render.yaml` is a Render Blueprint (New, then Blueprint, then pick this repo). It builds with `npm ci && npm run build`, runs on Node 24, generates `APPROVAL_SECRET`, and asks for the other secrets in Render's dashboard; none are stored in the repo. The `/day1` bench is hidden in production.
+
+### Keeping the demo up during judging
+
+- **Cold starts:** Render's free plan sleeps after about 15 minutes idle, and the next visit took about 34 seconds in a check on Nov 10. `.github/workflows/keep-warm.yml` pings the home page every 10 minutes (GitHub may delay a run by a few minutes). The other fix is a paid Render plan; then delete the workflow.
+- **Before submitting and again before Dec 1:** `npm run demo-check` checks the PayPal sandbox login, the demo PayPal account, Channel3 live search, the Anthropic key, the webhook id and the live site, without printing any secret. It reads `.env.local`, so it confirms your keys work; keep Render's values the same.
+- **No search backup on Render:** `data/catalog.json` isn't committed (check Channel3's terms first), so if Channel3 is down the demo finds nothing. Watch Channel3 credit before judging.
+- **Limits:** 12 runs per visitor per hour and 300 a day (`lib/guard.ts`), with a plain message when reached.
+- **Webhooks:** `DEMO_URL=https://shopping-assistant-z5u2.onrender.com npm run register-webhook` registers the webhook on your PayPal sandbox app (it changes that app's settings) and prints `PAYPAL_WEBHOOK_ID` to set in Render.
 
 ## Built with
 

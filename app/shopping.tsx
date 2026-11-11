@@ -26,6 +26,7 @@ type ShopResult = {
   recommended?: { id: string; reason: string; by: "ai" | "code" };
   message?: string;
   error?: string;
+  retry?: boolean; // a temporary failure (PayPal, the AI or the connection): shopping again may work
   funnel?: FunnelStep[];
   pick?: { product: CatalogProduct; reason: string; by: "ai" | "code" | "shopper"; quantity?: number; total?: number; total_line?: string | null };
   checks?: CheckResult[];
@@ -105,7 +106,7 @@ export default function Shopping({ approval, request, item, onEdit, onStage }: {
       const res = await fetch("/api/shop", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ approval }), signal: ctrl.signal });
       if (!res.ok || !res.body) {
         const data = await res.json().catch(() => ({}));
-        setResult({ error: data.error ?? "Something went wrong. Nothing was charged." });
+        setResult({ error: data.error ?? "Something went wrong. Nothing was charged.", retry: res.status >= 500 });
         return;
       }
       const reader = res.body.getReader();
@@ -128,13 +129,14 @@ export default function Shopping({ approval, request, item, onEdit, onStage }: {
           } else if (event.type === "item") {
             setShelf((sh) => ({ ...sh, checked: { ...sh.checked, [event.id]: { ok: event.ok, of: event.of } } }));
           } else if (event.type === "result") {
-            setResult(event);
+            // An error in the stream means PayPal or the AI didn't answer in time: worth one more try.
+            setResult(event.error && !event.pick ? { ...event, retry: true } : event);
           }
         }
       }
     } catch {
       // Nothing is ever held while shopping, so a dropped connection or Stop can't leave money held.
-      setResult(ctrl.signal.aborted ? { outcome: "stopped" } : { error: "The connection dropped. Nothing was held or charged." });
+      setResult(ctrl.signal.aborted ? { outcome: "stopped" } : { error: "The connection dropped. Nothing was held or charged.", retry: true });
     } finally {
       setRunning(false);
     }
@@ -247,7 +249,14 @@ export default function Shopping({ approval, request, item, onEdit, onStage }: {
     return (
       <section className="sheet" aria-live="polite">
         <p role="alert" className="alert">{result.error}</p>
-        <button type="button" className="link" onClick={onEdit}>Edit request</button>
+        {result.retry ? (
+          <div className="btns">
+            <button type="button" className="btn primary" onClick={() => void run()}>Try again</button>
+            <button type="button" className="btn secondary" onClick={onEdit}>Edit request</button>
+          </div>
+        ) : (
+          <button type="button" className="link" onClick={onEdit}>Edit request</button>
+        )}
       </section>
     );
   }

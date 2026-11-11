@@ -1,0 +1,25 @@
+# Keeps the public demo awake during judging (Dec 1-15). Render's free plan sleeps after about
+# 15 minutes without traffic, and the first visit after that takes close to a minute. This pings
+# the home page every 10 minutes so a judge's first click is fast. GitHub may delay scheduled runs
+# by a few minutes; that's fine. Turn it off after judging, or switch the Render service to a paid
+# plan and delete this file.
+name: Keep the demo warm
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Ping the demo
+        env:
+          DEMO_URL: https://shopping-assistant-z5u2.onrender.com/
+        run: |
+          # Retry a few times: a sleeping instance can take a while to answer the first request.
+          curl --fail --silent --show-error --retry 4 --retry-delay 15 --retry-all-errors --max-time 90 -o /dev/null -w "HTTP %{http_code} in %{time_total}s\n" "$DEMO_URL"

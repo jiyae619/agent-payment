@@ -7,7 +7,15 @@
 import { useEffect, useState } from "react";
 import { OUTCOME_TEXT, type Proof } from "@/lib/proof.ts";
 
-type Result = { intact: boolean; paypal: { order_status: string; custom_id: string | null; matches: boolean } | null };
+type Hook = { id: string; type: string; at: string; status: string | null; amount: number | null };
+type Result = { intact: boolean; paypal: { order_status: string; custom_id: string | null; matches: boolean } | null; webhooks?: Hook[] };
+const HOOK_TEXT: Record<string, string> = {
+  "PAYMENT.AUTHORIZATION.CREATED": "Hold placed",
+  "PAYMENT.AUTHORIZATION.VOIDED": "Hold released",
+  "PAYMENT.CAPTURE.COMPLETED": "Charged",
+  "PAYMENT.CAPTURE.DENIED": "Charge declined",
+  "PAYMENT.CAPTURE.REFUNDED": "Refunded",
+};
 
 const VERDICT = { checked: "✓ Checked", didnt_match: "✕ Didn't match", couldnt_check: "? Couldn't check" } as const;
 
@@ -73,6 +81,16 @@ export default function Verify() {
                   ? `✓ PayPal order ${proof.paypal.order_id} carries this proof's id (${proof.id}). Order status: ${result.paypal.order_status}.`
                   : `✕ PayPal order ${proof.paypal.order_id} doesn't carry this proof's id.`}
             </p>
+          )}
+          {result.intact && result.webhooks && result.webhooks.length > 0 && (
+            <div>
+              <span className="step">PayPal told us directly</span>
+              <ul className="sub">
+                {result.webhooks.map((h) => (
+                  <li key={h.id}>{new Date(h.at).toLocaleString()} · {HOOK_TEXT[h.type] ?? h.type}{h.amount !== null ? ` · $${h.amount.toFixed(2)}` : ""} · signature checked</li>
+                ))}
+              </ul>
+            </div>
           )}
 
           {result.intact && (

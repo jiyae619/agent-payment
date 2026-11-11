@@ -24,3 +24,6 @@ services:
         sync: false
       - key: ANTHROPIC_API_KEY
         sync: false
+      # Optional: from `npm run register-webhook`. Without it the app still reads every order back.
+      - key: PAYPAL_WEBHOOK_ID
+        sync: false

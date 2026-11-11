@@ -15,7 +15,9 @@
     "fixtures": "node --env-file=.env.local scripts/run-fixtures.mts",
     "eval-checker": "node --env-file=.env.local scripts/eval-checker.mts",
     "eval-pick": "node --env-file=.env.local scripts/eval-pick.mts",
-    "feedback": "node scripts/feedback-to-cases.mts"
+    "feedback": "node scripts/feedback-to-cases.mts",
+    "demo-check": "node --env-file=.env.local scripts/demo-check.mts",
+    "register-webhook": "node --env-file=.env.local scripts/register-webhook.mts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.5.0",
